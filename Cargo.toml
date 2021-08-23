@@ -1,0 +1,10 @@
+[package]
+name = "mk"
+
+license = "MIT"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+pam-sys = "0.5"
+rpassword = "5.0"
