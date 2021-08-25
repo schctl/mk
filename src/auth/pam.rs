@@ -4,6 +4,7 @@ use std::cell::UnsafeCell;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 
+use nix::unistd::Uid;
 use pam_sys::{raw::*, types::*};
 
 use super::Authenticator;
@@ -64,10 +65,20 @@ extern "C" fn pam_conversation(
 pub struct PamAuthenticator {}
 
 impl Authenticator for PamAuthenticator {
-    fn authenticate(&self, username: &str, password: &str) -> Result<(), ()> {
+    fn authenticate(&mut self, user: Uid) -> Result<(), ()> {
+        // First, get the user entry in `/etc/passwd/`.
+        let user = pwd::Passwd::from_uid(user.as_raw()).expect("Unknown user.");
+
         // We need mutable pointers to these later on.
-        let username = UnsafeCell::new(username);
-        let _password = UnsafeCell::new(password);
+
+        // Authenticate if user doesn't have a password.
+        let _password = UnsafeCell::new(
+            &match user.passwd {
+                Some(p) => p,
+                None => return Ok(()),
+            }[..],
+        );
+        let username = UnsafeCell::new(&user.name[..]);
         let service = UnsafeCell::new("mk");
 
         // Create the pam conversation structure, holding a callback to our pam conversation function.

@@ -1,16 +1,19 @@
 #![doc = include_str!("../README.md")]
 
 mod auth;
-
-use auth::Authenticator;
+mod env;
 
 fn main() {
-    let authenticator = auth::pam::PamAuthenticator {};
+    let uid = nix::unistd::getuid();
+    let euid = nix::unistd::geteuid();
 
-    authenticator
-        .authenticate(
-            std::env::var("MK_USER").unwrap().as_str(),
-            std::env::var("MK_PWD").unwrap().as_str(),
-        )
-        .unwrap();
+    let mut authenticator = auth::shadow::ShadowAuthenticator::new();
+
+    auth::authenticated_session(
+        &mut authenticator,
+        uid,
+        euid,
+        &std::env::args().nth(1).unwrap()[..],
+    )
+    .unwrap();
 }
