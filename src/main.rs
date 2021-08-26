@@ -4,16 +4,19 @@ mod auth;
 mod env;
 
 fn main() {
-    let uid = nix::unistd::getuid();
-    let euid = nix::unistd::geteuid();
-
     let mut authenticator = auth::shadow::ShadowAuthenticator::new();
+
+    let mut env = env::Env::new(
+        pwd::Passwd::from_uid(nix::unistd::getuid().as_raw()).unwrap(),
+        pwd::Passwd::from_uid(nix::unistd::geteuid().as_raw()).unwrap(),
+    );
+    env.init_args().unwrap();
+    env.init_vars().unwrap();
 
     auth::authenticated_session(
         &mut authenticator,
-        uid,
-        euid,
         &std::env::args().nth(1).unwrap()[..],
+        &env,
     )
     .unwrap();
 }

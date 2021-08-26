@@ -40,30 +40,23 @@ fn prepare_user(user: &pwd::Passwd) -> Result<(), ()> {
 /// as any user they have been permitted to.
 pub fn authenticated_session<T: Authenticator>(
     authenticator: &mut T,
-    user: Uid,
-    target: Uid,
     command: &str,
+    env: &env::Env,
 ) -> Result<(), ()> {
-    // Need for later.
-    let user = pwd::Passwd::from_uid(user.as_raw()).unwrap();
-    let target_user = pwd::Passwd::from_uid(target.as_raw()).unwrap();
-
     // First, check if the user is authenticated.
-    authenticator.authenticate(Uid::from_raw(user.uid))?;
+    authenticator.authenticate(Uid::from_raw(env.origin.uid))?;
 
     // Check if `user` is permitted to run as `target`.
     // TODO
 
-    prepare_user(&target_user)?;
+    prepare_user(&env.target)?;
 
     nix::unistd::execvpe(
         &CString::new(command).unwrap()[..],
-        &env::create_env(target_user)[..],
-        &env::get_args()[..],
+        env.get_args(),
+        env.get_vars(),
     )
     .unwrap();
-
-    // prepare_user(&user)?;
 
     Ok(())
 }

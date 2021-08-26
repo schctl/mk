@@ -1,9 +1,16 @@
+cargo-features = ["strip"]
+
 [package]
 name = "mk"
 
 license = "MIT"
 version = "0.0.1"
 edition = "2018"
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
 
 [dependencies]
 pwd = "1.3"
