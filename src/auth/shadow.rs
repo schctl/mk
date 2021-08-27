@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 use nix::unistd::Uid;
 
 use super::Authenticator;
-use crate::errors::MkError;
+
+use crate::prelude::*;
 
 /// Holds all the information required for authentication using `/etc/shadow`.
 pub struct ShadowAuthenticator {
@@ -24,7 +25,7 @@ impl ShadowAuthenticator {
 }
 
 impl Authenticator for ShadowAuthenticator {
-    fn authenticate(&mut self, user: &pwd::Passwd) -> Result<(), MkError> {
+    fn authenticate(&mut self, user: &pwd::Passwd) -> MkResult<()> {
         let uid = Uid::from_raw(user.uid);
 
         // Check if user is in the list of authenticated users.
@@ -49,7 +50,7 @@ impl Authenticator for ShadowAuthenticator {
                 None => return Ok(()),
             }
         } else if password == "*" {
-            // Prevent login
+            // Prevent login.
             return Err(MkError::AuthError);
         }
 

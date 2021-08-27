@@ -6,6 +6,7 @@ use std::str::Utf8Error;
 use nix::errno::Errno;
 use thiserror::Error;
 
+/// All error types that we handle.
 #[derive(Error, Debug)]
 pub enum MkError {
     /// An interior nul byte was found.
@@ -20,6 +21,9 @@ pub enum MkError {
     /// System call error number.
     #[error("Error number from a system call [errno: {0}]")]
     Errno(#[from] Errno),
+    /// IO Error.
+    #[error("IO Error")]
+    IoError(#[from] std::io::Error),
 }
 
 impl From<libcrypt_sys::StrError> for MkError {

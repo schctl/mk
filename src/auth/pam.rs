@@ -1,4 +1,4 @@
-//! User authenticator using Linux PAM.
+//! User authenticator using PAM.
 
 use std::cell::UnsafeCell;
 use std::ffi::CStr;
@@ -7,7 +7,8 @@ use std::os::raw::{c_char, c_int, c_void};
 use pam_sys::{raw::*, types::*};
 
 use super::Authenticator;
-use crate::errors::MkError;
+
+use crate::prelude::*;
 
 /// PAM conversation function.
 ///
@@ -65,7 +66,7 @@ extern "C" fn pam_conversation(
 pub struct PamAuthenticator {}
 
 impl Authenticator for PamAuthenticator {
-    fn authenticate(&mut self, user: &pwd::Passwd) -> Result<(), MkError> {
+    fn authenticate(&mut self, user: &pwd::Passwd) -> MkResult<()> {
         // Authenticate if user doesn't have a password.
         let _password = UnsafeCell::new(
             &match user.passwd.clone() {
