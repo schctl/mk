@@ -6,6 +6,7 @@ name = "mk"
 license = "MIT"
 version = "0.0.1"
 edition = "2018"
+authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 
 [profile.release]
 lto = true
@@ -18,5 +19,7 @@ pam-sys = "0.5"
 nix = "0.22"
 shadow = "0.0.1"
 rpassword = "5.0"
+
+thiserror = "1.0"
 
 libcrypt-sys = { path = "libcrypt-sys" }

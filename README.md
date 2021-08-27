@@ -1,6 +1,6 @@
-# mk (^∇^) b
+# mk (^∇^)-b
 
-`mk` is a tool to run unix commands as another user, similar to [`sudo`](https://www.sudo.ws/) or OpenBSD's `doas`. Linux support is targeted first.
+`mk` is a tool to run unix commands as another user, similar to OpenBSD's `doas`. Linux support is targeted first.
 
 ## License
 

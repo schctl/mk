@@ -4,10 +4,10 @@ use std::cell::UnsafeCell;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 
-use nix::unistd::Uid;
 use pam_sys::{raw::*, types::*};
 
 use super::Authenticator;
+use crate::errors::MkError;
 
 /// PAM conversation function.
 ///
@@ -65,15 +65,10 @@ extern "C" fn pam_conversation(
 pub struct PamAuthenticator {}
 
 impl Authenticator for PamAuthenticator {
-    fn authenticate(&mut self, user: Uid) -> Result<(), ()> {
-        // First, get the user entry in `/etc/passwd/`.
-        let user = pwd::Passwd::from_uid(user.as_raw()).expect("Unknown user.");
-
-        // We need mutable pointers to these later on.
-
+    fn authenticate(&mut self, user: &pwd::Passwd) -> Result<(), MkError> {
         // Authenticate if user doesn't have a password.
         let _password = UnsafeCell::new(
-            &match user.passwd {
+            &match user.passwd.clone() {
                 Some(p) => p,
                 None => return Ok(()),
             }[..],
@@ -98,11 +93,9 @@ impl Authenticator for PamAuthenticator {
         };
 
         if ret != PamReturnCode::SUCCESS as c_int {
-            eprintln!("Unable to start PAM {}", ret);
-            return Err(());
+            return Err(MkError::AuthError);
         }
 
-        println!("Started PAM session!");
         Ok(())
     }
 }

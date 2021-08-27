@@ -2,6 +2,7 @@
 
 mod auth;
 mod env;
+mod errors;
 
 fn main() {
     let mut authenticator = auth::shadow::ShadowAuthenticator::new();

@@ -6,9 +6,11 @@ set -e
 
 mode=debug
 
-if [ $1 = 'release' ]; then
-    cargo build --release
-    mode=release
+if [ -n "$1" ]; then
+    if [ $1 = 'release' ]; then
+        cargo build --release
+        mode=release
+    fi
 else
     cargo build
 fi
