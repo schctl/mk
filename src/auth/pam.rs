@@ -66,10 +66,10 @@ extern "C" fn pam_conversation(
 pub struct PamAuthenticator {}
 
 impl Authenticator for PamAuthenticator {
-    fn authenticate(&mut self, user: &pwd::Passwd) -> MkResult<()> {
+    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
         // Authenticate if user doesn't have a password.
         let _password = UnsafeCell::new(
-            &match user.passwd.clone() {
+            &match user.password.clone() {
                 Some(p) => p,
                 None => return Ok(()),
             }[..],

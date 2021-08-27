@@ -1,18 +1,19 @@
 #![doc = include_str!("../README.md")]
 #![feature(never_type)]
 
-mod auth;
-mod command;
-mod env;
-mod errors;
-mod prelude;
+pub mod auth;
+pub mod command;
+pub mod env;
+pub mod errors;
+pub mod prelude;
+pub mod util;
 
 fn main() {
     let authenticator = auth::shadow::ShadowAuthenticator::new();
 
     let mut env = env::Env::new(
-        pwd::Passwd::from_uid(nix::unistd::getuid().as_raw()).unwrap(),
-        pwd::Passwd::from_uid(nix::unistd::geteuid().as_raw()).unwrap(),
+        mk_pwd::Passwd::from_uid(util::get_uid()).unwrap(),
+        mk_pwd::Passwd::from_uid(util::get_euid()).unwrap(),
     );
     env.init_args().unwrap();
     env.init_vars().unwrap();

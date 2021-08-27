@@ -9,15 +9,15 @@ use crate::prelude::*;
 /// This is passed to [`crate::command::CommandExecutor`] and wraps all execution details, such
 /// as the user's `mk` config, options, target user, environment variables, and arguments.
 pub struct Env {
-    pub origin: pwd::Passwd,
-    pub target: pwd::Passwd,
+    pub origin: mk_pwd::Passwd,
+    pub target: mk_pwd::Passwd,
     args: Vec<String>,
     vars: HashMap<String, String>,
 }
 
 impl Env {
     #[must_use]
-    pub fn new(origin: pwd::Passwd, target: pwd::Passwd) -> Self {
+    pub fn new(origin: mk_pwd::Passwd, target: mk_pwd::Passwd) -> Self {
         Self {
             origin,
             target,
@@ -49,7 +49,7 @@ impl Env {
         let target = self.target.clone();
 
         self.push_var("USER", &target.name[..])?;
-        self.push_var("HOME", &target.dir[..])?;
+        self.push_var("HOME", &target.directory[..])?;
         self.push_var("SHELL", &target.shell[..])?;
 
         self.push_var(

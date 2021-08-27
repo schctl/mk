@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use nix::unistd::Uid;
+use mk_pwd::Uid;
 
 use super::Authenticator;
 
@@ -25,20 +25,18 @@ impl ShadowAuthenticator {
 }
 
 impl Authenticator for ShadowAuthenticator {
-    fn authenticate(&mut self, user: &pwd::Passwd) -> MkResult<()> {
-        let uid = Uid::from_raw(user.uid);
-
+    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
         // Check if user is in the list of authenticated users.
-        if let Some(u) = self.users.get(&uid) {
+        if let Some(u) = self.users.get(&user.uid) {
             if Instant::now() - *u < Duration::from_secs(600) {
                 return Ok(());
             } else {
-                self.users.remove(&uid);
+                self.users.remove(&user.uid);
             }
         }
 
         // Authenticate if user doesn't have a password.
-        let mut password = match user.passwd.clone() {
+        let mut password = match user.password.clone() {
             Some(p) => p,
             None => return Ok(()),
         };
@@ -62,7 +60,7 @@ impl Authenticator for ShadowAuthenticator {
             return Err(MkError::AuthError);
         }
 
-        self.users.insert(uid, Instant::now());
+        self.users.insert(user.uid, Instant::now());
         Ok(())
     }
 }

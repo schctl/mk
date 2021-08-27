@@ -1,0 +1,11 @@
+[package]
+name = "mk-pwd"
+
+license = "MIT"
+version = "0.0.1"
+edition = "2018"
+authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
+
+[dependencies]
+libc = "0.2"
+thiserror = "1.0"

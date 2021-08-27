@@ -20,5 +20,5 @@ pub trait Authenticator {
     ///
     /// [`MkError::AuthError`] - if the user failed the authentication.
     /// [`MkError`] - any other error.
-    fn authenticate(&mut self, user: &pwd::Passwd) -> Result<(), MkError>;
+    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> Result<(), MkError>;
 }

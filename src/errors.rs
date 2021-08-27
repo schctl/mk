@@ -3,7 +3,6 @@
 use std::ffi::NulError;
 use std::str::Utf8Error;
 
-use nix::errno::Errno;
 use thiserror::Error;
 
 /// All error types that we handle.
@@ -18,9 +17,6 @@ pub enum MkError {
     /// Unable to authenticate a user.
     #[error("Error authenticating a user")]
     AuthError,
-    /// System call error number.
-    #[error("Error number from a system call [errno: {0}]")]
-    Errno(#[from] Errno),
     /// IO Error.
     #[error("IO Error")]
     IoError(#[from] std::io::Error),
