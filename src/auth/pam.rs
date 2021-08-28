@@ -1,10 +1,9 @@
 //! User authenticator using PAM.
 
-use std::cell::UnsafeCell;
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_int, c_void};
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_int, c_void};
 
-use pam_sys::{raw::*, types::*};
+use mk_pam::ffi as pam;
 
 use super::Authenticator;
 
@@ -25,8 +24,8 @@ use crate::prelude::*;
 /// * `_appdata_ptr` - Set to the second element of the structure this function was provided in.
 extern "C" fn pam_conversation(
     num_msgs: c_int,
-    msgs: *mut *mut PamMessage,
-    response: *mut *mut PamResponse,
+    msgs: *mut *const pam::pam_message,
+    response: *mut *mut pam::pam_response,
     _appdata_ptr: *mut c_void,
 ) -> c_int {
     // Everything in this is pretty unsafe.
@@ -36,65 +35,102 @@ extern "C" fn pam_conversation(
             let msg = *msgs.offset(i);
             let response = *response.offset(i);
 
-            match (*msg).msg_style.into() {
-                PamMessageStyle::PROMPT_ECHO_ON | PamMessageStyle::PROMPT_ECHO_OFF => {
-                    // Create a response for this message
-                    *response = PamResponse {
+            match (*msg).msg_style as u32 {
+                pam::PAM_PROMPT_ECHO_OFF | pam::PAM_PROMPT_ECHO_ON => {
+                    // Create a response for this message.
+                    *response = pam::pam_response {
                         // Read password from terminal and get a mut ptr to it.
-                        resp: rpassword::read_password_from_tty(Some("Password: "))
-                            .unwrap()
-                            .as_mut_str()
-                            .as_mut_ptr() as *mut c_char,
-                        // Currently unused and 0 is expected
+                        resp: CString::new(
+                            rpassword::read_password_from_tty(Some("[mk] Password > ")).unwrap(),
+                        )
+                        .unwrap()
+                        .into_raw(),
+                        // Currently unused and 0 is expected.
                         resp_retcode: 0,
                     };
                 }
-                PamMessageStyle::TEXT_INFO => {
+                pam::PAM_TEXT_INFO => {
                     println!("{}", CStr::from_ptr((*msg).msg).to_str().unwrap());
                 }
-                PamMessageStyle::ERROR_MSG => {
+                pam::PAM_ERROR_MSG => {
                     eprintln!("{}", CStr::from_ptr((*msg).msg).to_str().unwrap());
                 }
+                _ => {}
             }
         }
     }
 
-    PamReturnCode::SUCCESS as c_int
+    0
 }
 
 /// Linux PAM authentication structure. Holds all data required to begin a session with PAM.
 pub struct PamAuthenticator {}
 
+impl PamAuthenticator {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl Authenticator for PamAuthenticator {
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
-        // Authenticate if user doesn't have a password.
-        let _password = UnsafeCell::new(
-            &match user.password.clone() {
-                Some(p) => p,
-                None => return Ok(()),
-            }[..],
-        );
-        let username = UnsafeCell::new(&user.name[..]);
-        let service = UnsafeCell::new("mk");
+        // See http://uw714doc.sco.com/en/SEC_pam/pam_appl-3.html
+
+        let username = CString::new(&user.name[..])?;
+        let service = CString::new("mk")?;
+
+        let mut pamh: *mut pam::pam_handle = std::ptr::null_mut();
 
         // Create the pam conversation structure, holding a callback to our pam conversation function.
-        let pam_conv = PamConversation {
+        let pam_conv = pam::pam_conv {
             conv: Some(pam_conversation),
-            data_ptr: std::ptr::null_mut(),
+            appdata_ptr: std::ptr::null_mut(),
         };
 
         // Start the pam conversation.
+        let ret =
+            unsafe { pam::pam_start(service.as_ptr(), username.as_ptr(), &pam_conv, &mut pamh) };
+
+        if ret != pam::PAM_SUCCESS as c_int {
+            println!("Failed to started PAM {}", ret);
+            return Err(MkError::AuthError);
+        }
+
+        // Set items
         let ret = unsafe {
-            pam_start(
-                service.get() as *mut c_char,
-                username.get() as *mut c_char,
-                &pam_conv,
-                std::ptr::null_mut(),
+            pam::pam_set_item(
+                pamh,
+                pam::PAM_RUSER as c_int,
+                username.as_ptr() as *const c_void,
             )
         };
 
-        if ret != PamReturnCode::SUCCESS as c_int {
+        if ret != pam::PAM_SUCCESS as c_int {
+            println!("Failed to set PAM user {}", ret);
             return Err(MkError::AuthError);
+        }
+
+        // Authenticate user
+        let ret = unsafe { pam::pam_authenticate(pamh, 0) };
+
+        if ret != pam::PAM_SUCCESS as c_int {
+            println!("Failed to authenticate user {}", ret);
+            unsafe { pam::pam_end(pamh, ret) };
+            return Err(MkError::AuthError);
+        }
+
+        // Check if the user's account is still active, and has permission to access the system
+        // at this time.
+        let ret = unsafe { pam::pam_acct_mgmt(pamh, 0) };
+
+        if ret == pam::PAM_NEW_AUTHTOK_REQD as c_int {
+            let ret = unsafe { pam::pam_chauthtok(pamh, 0) };
+            if ret != pam::PAM_SUCCESS as c_int {
+                println!("Failed to authenticate user {}", ret);
+                unsafe { pam::pam_end(pamh, ret) };
+                return Err(MkError::AuthError);
+            }
         }
 
         Ok(())

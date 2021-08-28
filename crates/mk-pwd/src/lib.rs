@@ -30,7 +30,6 @@ fn cstr_to_string(ptr: *mut c_char) -> PwdResult<String> {
     if ptr.is_null() {
         return Err(PwdError::NullPtr);
     }
-
     Ok(unsafe { CStr::from_ptr(ptr) }.to_str()?.to_string())
 }
 

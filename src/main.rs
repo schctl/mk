@@ -9,7 +9,7 @@ pub mod prelude;
 pub mod util;
 
 fn main() {
-    let authenticator = auth::shadow::ShadowAuthenticator::new();
+    let authenticator = auth::pam::PamAuthenticator::new();
 
     let mut env = env::Env::new(
         mk_pwd::Passwd::from_uid(util::get_uid()).unwrap(),

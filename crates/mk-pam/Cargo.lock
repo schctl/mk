@@ -178,13 +178,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.100"
+version = "0.2.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1fa8cddc8fbbee11227ef194b5317ed014b8acbf15139bd716a18ad3fe99ec5"
-
-[[package]]
-name = "libcrypt-sys"
-version = "0.0.1"
+checksum = "3cb00336871be5ed2c8ed44b60ae9959dc5b9f08539422ed43f09e34ecaeba21"
 
 [[package]]
 name = "libloading"
@@ -212,33 +208,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
-name = "mk"
-version = "0.0.1"
-dependencies = [
- "libc",
- "libcrypt-sys",
- "mk-pam",
- "mk-pwd",
- "rpassword",
- "shadow",
- "thiserror",
-]
-
-[[package]]
 name = "mk-pam"
 version = "0.0.1"
 dependencies = [
  "bindgen",
  "libc",
  "num_enum",
- "thiserror",
-]
-
-[[package]]
-name = "mk-pwd"
-version = "0.0.1"
-dependencies = [
- "libc",
  "thiserror",
 ]
 
@@ -334,16 +309,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 
 [[package]]
-name = "rpassword"
-version = "5.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc936cf8a7ea60c58f030fd36a612a48f440610214dc54bc36431f9ea0c3efb"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -354,15 +319,6 @@ name = "serde"
 version = "1.0.129"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1f72836d2aa753853178eda473a3b9d8e4eefdaf20523b919677e6de489f8f1"
-
-[[package]]
-name = "shadow"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcaa1dbf13cc052b53af59e70dd467e8e94d6abf8d0eac1f1d15d3e165973b86"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "shlex"

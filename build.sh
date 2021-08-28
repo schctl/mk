@@ -5,19 +5,16 @@
 
 set -e
 
-# Use `mk` if it is in the path ( ͡° ͜ʖ ͡°)-b
-if [ $(which ./mk 2>/dev/null) ]; then
-    priv=./mk
-elif [ $(which mk 2>/dev/null) ]; then
-    priv=mk
-elif [ $(which doas 2>/dev/null) ]; then
-    priv=doas
-else
-    priv=sudo
-fi
-
 mode=debug
 bin=mk
+priv=doas
+
+# Use `mk` if it is in the path ( ͡° ͜ʖ ͡°)-b
+if [ $(which mk 2>/dev/null) ]; then
+    priv=mk
+elif [ $(which sudo 2>/dev/null) ]; then
+    priv=sudo
+fi
 
 if [ -n "$1" ]; then
     if [ $1 = 'release' ]; then

@@ -14,12 +14,15 @@ pub enum MkError {
     /// Error interpreting byte sequence as utf-8.
     #[error("Error interpreting byte sequence as utf-8")]
     Utf8Error(#[from] Utf8Error),
-    /// Unable to authenticate a user.
-    #[error("Error authenticating a user")]
-    AuthError,
     /// IO Error.
     #[error("IO Error")]
     IoError(#[from] std::io::Error),
+    /// Error authenticating a user
+    #[error("Error authenticating a user")]
+    AuthError,
+    /// A null pointer was found.
+    #[error("A null pointer was found")]
+    NullPtr,
 }
 
 impl From<libcrypt_sys::StrError> for MkError {

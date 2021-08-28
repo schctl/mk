@@ -16,11 +16,11 @@ codegen-units = 1
 [dependencies]
 libc = "0.2"
 
-pam-sys = "0.5"
 shadow = "0.0.1"
 
 rpassword = "5.0"
 thiserror = "1.0"
 
 mk-pwd = { path = "crates/mk-pwd" }
+mk-pam = { path = "crates/mk-pam" }
 libcrypt-sys = { path = "crates/libcrypt-sys" }
