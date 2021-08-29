@@ -11,6 +11,7 @@ authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 libc = "0.2"
 num_enum = "0.5"
 thiserror = "1.0"
+lazy_static = "1.4"
 
 [build-dependencies]
 bindgen = "0.59"

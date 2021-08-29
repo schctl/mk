@@ -212,6 +212,7 @@ name = "mk-pam"
 version = "0.0.1"
 dependencies = [
  "bindgen",
+ "lazy_static",
  "libc",
  "num_enum",
  "thiserror",
