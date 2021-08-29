@@ -2,6 +2,8 @@
 //!
 //! This crate provides **experimental** safe interfaces to PAM as well.
 
+#![feature(vec_into_raw_parts)]
+
 use std::{convert::TryFrom, ffi::CString};
 
 use libc::{c_int, c_void};
@@ -22,20 +24,20 @@ pub mod ffi {
     include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
 }
 
+// See http://uw714doc.sco.com/en/SEC_pam/pam_appl-3.html
+
 /// Represents a PAM handle.
 pub struct Handle {
-    interior: *mut ffi::pam_handle,
+    pub interior: *mut ffi::pam_handle,
 }
 
 impl Handle {
     /// Safe interface to [`ffi::pam_start`].
     ///
-    /// This is the first of the Linux-PAM functions that must be called by an application.
+    /// This is the first of the PAM functions that must be called by an application.
     /// It initializes the interface and reads the system configuration file, `/etc/pam.conf`.
     /// Following a successful return, the contents of *pamh is a handle that provides continuity for
-    /// successive calls to the Linux-PAM library. The arguments expected by pam_start are as follows:
-    /// the service_name of the program, the username of the individual to be authenticated, a pointer
-    /// to an application-supplied pam_conv structure and a pointer to a pam_handle_t pointer.
+    /// successive calls to the PAM library.
     pub fn start(
         service_name: &str,
         user_name: &str,
@@ -53,6 +55,9 @@ impl Handle {
 
             ffi::pam_conv {
                 conv: Some(conv::__raw_pam_conv),
+                // This is a very hack-y approach.
+                // This is actually an invalid pointer, but in `__raw_pam_conv`
+                // we treat the pointer's address as a number, and use that as an index.
                 appdata_ptr: { index as *mut c_void },
             }
         };
@@ -61,6 +66,10 @@ impl Handle {
 
         let ret =
             unsafe { ffi::pam_start(service_name.as_ptr(), user_name.as_ptr(), &conv, &mut pamh) };
+
+        if pamh.is_null() {
+            return Err(PamError::NullPtr);
+        }
 
         match RawError::try_from(ret as i32) {
             Ok(e) => Err(e.into()),

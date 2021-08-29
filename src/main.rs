@@ -6,6 +6,7 @@ pub mod command;
 pub mod env;
 pub mod errors;
 pub mod prelude;
+pub mod prompt;
 pub mod util;
 
 fn main() {

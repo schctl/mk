@@ -18,6 +18,7 @@ libc = "0.2"
 
 shadow = "0.0.1"
 
+colored = "2"
 rpassword = "5.0"
 thiserror = "1.0"
 

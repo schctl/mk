@@ -26,10 +26,12 @@ lazy_static! {
 
 /// Contains the PAM conversation function. This will be called by a loaded PAM module.
 pub struct Conversation {
-    pub conv: Box<dyn Fn(&Vec<Message>) -> Vec<Response>>,
+    /// Unlike the regular PAM conversation function, this is called for every message provided.
+    pub conv: Box<dyn Fn(&Message) -> Option<Response>>,
 }
 
 unsafe impl Send for Conversation {}
+unsafe impl Sync for Conversation {}
 
 /// A PAM message.
 #[derive(Debug, Clone)]
@@ -95,61 +97,71 @@ impl TryFrom<Response> for ffi::pam_response {
     }
 }
 
-/// Exported PAM conversation.
+/// Exported PAM conversation function.
+///
+/// From the Linux man pages.
+/// > The PAM library uses an application-defined callback to allow a direct communication between
+/// > a loaded module and the application. This callback is specified by the struct `pam_conv`
+/// > passed to `pam_start(3)` at the start of the transaction.
+///
+/// # Arguments
+///
+/// * `num_msgs` - The number of message pointers held in the `msgs` argument.
+/// * `msgs` - Array of [`PamMessage`] pointers.
+/// * `response` - Pointer to array of [`PamResponse`].
+/// * `appdata_ptr` - Set to the second element of the structure this function was provided in.
+///   In our case, the value points to an invalid memory location, but we treat the pointer as
+///   a number, and use that to index [`GLOBAL_CONV_PTRS`].
 pub(crate) extern "C" fn __raw_pam_conv(
     num_msgs: c_int,
     raw_msgs: *mut *const ffi::pam_message,
     raw_responses: *mut *mut ffi::pam_response,
     appdata_ptr: *mut c_void,
 ) -> c_int {
-    let mut msgs = Vec::with_capacity(num_msgs as usize);
+    // Lookup if a conversation function is available
+    if let Some(f) = GLOBAL_CONV_PTRS
+        .lock()
+        .unwrap()
+        // Interpret pointer's raw value as a number and
+        // use that as index.
+        .get(&(appdata_ptr as c_int))
+    {
+        let mut responses = Vec::new();
 
-    // Create messages
-    unsafe {
         for i in 0..num_msgs as isize {
-            let raw_msg = *raw_msgs.offset(i);
+            let raw_msg = unsafe { *raw_msgs.offset(i) };
 
-            let contents = match util::cstr_to_string((*raw_msg).msg) {
+            // Create message
+            let contents = match unsafe { util::cstr_to_string((*raw_msg).msg) } {
                 Ok(s) => s,
                 // I DON'T KNOW IF THESE RETURN CODES ARE CORRECT
                 // (but it should be fine for now)
                 Err(_) => return RawError::Buffer.into(),
             };
 
-            msgs.push(match (*raw_msg).msg_style as u32 {
+            let msg = match unsafe { (*raw_msg).msg_style as u32 } {
                 ffi::PAM_PROMPT_ECHO_OFF => Message::Prompt(contents),
                 ffi::PAM_PROMPT_ECHO_ON => Message::PromptEcho(contents),
                 ffi::PAM_TEXT_INFO => Message::ShowText(contents),
                 ffi::PAM_ERROR_MSG => Message::ShowError(contents),
                 // Error code - SAME HERE
                 _ => return RawError::BadItem.into(),
-            })
-        }
-    }
+            };
 
-    // Call provided conversation function
-    let responses = match GLOBAL_CONV_PTRS
-        .lock()
-        .unwrap()
-        .get(&unsafe { *(appdata_ptr as *mut c_int) })
-    {
-        Some(f) => (f.conv)(&msgs),
-        _ => return RawError::BadItem.into(),
-    };
-
-    // Write response
-    unsafe {
-        for (i, resp) in responses.into_iter().enumerate() {
-            let raw_resp = *raw_responses.offset(i as isize);
-
-            *raw_resp = match ffi::pam_response::try_from(resp) {
-                Ok(r) => r,
-                // Error code - SAME HERE
-                Err(_) => return RawError::BadItem.into(),
+            // Get response and write it
+            if let Some(resp) = (f.conv)(&msg) {
+                responses.push(match ffi::pam_response::try_from(resp) {
+                    Ok(r) => r,
+                    // Error code - SAME HERE
+                    Err(_) => return RawError::BadItem.into(),
+                })
             }
         }
-    }
 
-    // Success
-    0
+        unsafe { *raw_responses = responses.into_raw_parts().0 };
+
+        return ffi::PAM_SUCCESS as c_int;
+    };
+
+    RawError::BadItem.into()
 }
