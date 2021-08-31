@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
+use std::os::raw::{c_int, c_void};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use libc::{c_char, c_int, c_void};
+use mk_common::errors::FfiError;
 
 use crate::ffi;
 use crate::prelude::*;
@@ -46,34 +47,27 @@ pub enum Message {
     ShowText(String),
 }
 
-impl TryFrom<ffi::pam_message> for Message {
-    type Error = *const c_char;
+impl TryFrom<*const ffi::pam_message> for Message {
+    type Error = PamError;
 
-    /// Convert a raw [`ffi::pam_message`] to a [`Message`]. Returns the
+    /// Convert a raw *[`ffi::pam_message`] to a [`Message`]. Returns the
     /// message contents as a [`String`] if it is of an unknown type.
-    fn try_from(value: ffi::pam_message) -> Result<Self, Self::Error> {
-        let msg = match unsafe { CStr::from_ptr(value.msg) }.to_str() {
-            Ok(s) => s.to_string(),
-            Err(_) => return Err(value.msg),
-        };
+    fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
+        if value.is_null() {
+            return Err(FfiError::InvalidPtr.into());
+        }
+
+        let value = unsafe { *value };
+
+        let msg = unsafe { CStr::from_ptr(value.msg) }.to_str()?.to_string();
 
         match value.msg_style as u32 {
             ffi::PAM_PROMPT_ECHO_OFF => Ok(Self::Prompt(msg)),
             ffi::PAM_PROMPT_ECHO_ON => Ok(Self::PromptEcho(msg)),
             ffi::PAM_ERROR_MSG => Ok(Self::ShowError(msg)),
             ffi::PAM_TEXT_INFO => Ok(Self::ShowText(msg)),
-            _ => Err(value.msg),
+            _ => Err(RawError::BadItem.into()),
         }
-    }
-}
-
-impl TryFrom<*const ffi::pam_message> for Message {
-    type Error = *const c_char;
-
-    /// Convert a raw *[`ffi::pam_message`] to a [`Message`]. Returns the
-    /// message contents as a [`String`] if it is of an unknown type.
-    fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
-        Self::try_from(unsafe { *value })
     }
 }
 

@@ -1,34 +1,36 @@
 //! Error types.
 
-use std::ffi::NulError;
-use std::str::Utf8Error;
-
+use mk_common::errors::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use crate::ffi;
 
 pub type PamResult<T> = Result<T, PamError>;
 
 /// All possible error types.
-#[derive(Error, Debug, Clone)]
+#[derive(ThisError, Debug)]
 pub enum PamError {
     /// Raw PAM error code.
     #[error("Raw PAM error code")]
     Raw(#[from] RawError),
-    /// An interior nul byte was found.
-    #[error("Interior nul byte")]
-    NulByte(#[from] NulError),
-    /// UTF-8 conversion error.
-    #[error("UTF-8 error")]
-    Utf8(#[from] Utf8Error),
-    /// A null pointer was found.
-    #[error("Null pointer")]
-    NullPtr,
+
+    /// FFI error.
+    #[error("FFI error")]
+    Ffi(FfiError),
+}
+
+impl<T> From<T> for PamError
+where
+    T: Into<FfiError>,
+{
+    fn from(e: T) -> Self {
+        Self::Ffi(e.into())
+    }
 }
 
 /// PAM return codes, which we treat as errors for easier handling.
-#[derive(Error, IntoPrimitive, TryFromPrimitive, Debug, Clone)]
+#[derive(ThisError, IntoPrimitive, TryFromPrimitive, Debug, Clone)]
 #[repr(i32)]
 pub enum RawError {
     /// `dlopen()` failure when dynamically loading a service module.

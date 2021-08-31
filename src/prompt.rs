@@ -31,8 +31,16 @@ pub fn prompt(user: &str, msg: &str, is_password: bool, is_colored: bool) -> MkR
     let prompt = if is_colored && unsafe { libc::isatty(std::io::stdout().as_raw_fd()) == 1 } {
         format!(
             "[{}][{}] {}",
-            if is_colored { SERVICE_NAME.dimmed() } else { SERVICE_NAME.normal() },
-            if is_colored { user.bold().italic() } else { user.normal() },
+            if is_colored {
+                SERVICE_NAME.dimmed()
+            } else {
+                SERVICE_NAME.normal()
+            },
+            if is_colored {
+                user.bold().italic()
+            } else {
+                user.normal()
+            },
             msg
         )
     } else {

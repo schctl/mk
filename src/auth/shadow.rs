@@ -16,7 +16,7 @@ pub struct ShadowAuthenticator {
 }
 
 impl ShadowAuthenticator {
-    #[must_use]
+#[must_use]
     pub fn new() -> Self {
         Self {
             users: HashMap::new(),
@@ -49,15 +49,15 @@ impl Authenticator for ShadowAuthenticator {
             }
         } else if password == "*" {
             // Prevent login.
-            return Err(MkError::AuthError);
+            return Err(MkError::Auth);
         }
 
         let auth_password =
             rpassword::prompt_password_stdout(&format!("[mk] password for {} > ", user.name)[..])
                 .unwrap();
 
-        if password != libcrypt_sys::crypt(&auth_password, &password)? {
-            return Err(MkError::AuthError);
+        if password != mk_crypt::crypt(&auth_password, &password)? {
+            return Err(MkError::Auth);
         }
 
         self.users.insert(user.uid, Instant::now());

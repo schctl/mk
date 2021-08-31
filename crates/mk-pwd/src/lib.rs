@@ -1,37 +1,11 @@
 //! Interface to Unix's `pwd.h`.
 
-use std::ffi::{CStr, CString, NulError};
-use std::str::Utf8Error;
+use std::ffi::CString;
 
-use libc::c_char;
-use thiserror::Error;
+use mk_common::{errors::FfiError, util};
 
 pub type Uid = libc::uid_t;
 pub type Gid = libc::gid_t;
-
-/// All error types that we handle.
-#[derive(Error, Debug)]
-pub enum PwdError {
-    /// An interior nul byte was found.
-    #[error("An interior nul byte was found")]
-    NulError(#[from] NulError),
-    /// Error interpreting byte sequence as utf-8.
-    #[error("Error interpreting byte sequence as utf-8")]
-    Utf8Error(#[from] Utf8Error),
-    /// Null pointer error.
-    #[error("Null pointer error")]
-    NullPtr,
-}
-
-pub type PwdResult<T> = Result<T, PwdError>;
-
-/// Utility to convert from a C *[`c_char`] to a Rust [`String`] safely.
-fn cstr_to_string(ptr: *mut c_char) -> PwdResult<String> {
-    if ptr.is_null() {
-        return Err(PwdError::NullPtr);
-    }
-    Ok(unsafe { CStr::from_ptr(ptr) }.to_str()?.to_string())
-}
 
 /// The `/etc/passwd` file is a text file that describes user login accounts for the system.
 /// Each line of the file describes a single user, this struct is a representation of each entry.
@@ -62,67 +36,45 @@ impl Passwd {
     ///
     /// # Errors
     ///
-    /// [`PwdError::NullPtr`] - usually when an entry is non existent.
-    #[must_use]
-    pub fn from_raw(ptr: *mut libc::passwd) -> PwdResult<Self> {
+    /// [`PwdError::InvalidPtr`] - usually when an entry is non existent.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be a valid pointer to a [`libc::passwd`].
+    pub unsafe fn from_raw(ptr: *mut libc::passwd) -> Result<Self, FfiError> {
         if ptr.is_null() {
-            return Err(PwdError::NullPtr);
+            return Err(FfiError::InvalidPtr);
         }
 
-        let raw = unsafe { *ptr };
+        let raw = *ptr;
 
         Ok(Self {
-            name: cstr_to_string(raw.pw_name)?,
-            password: match cstr_to_string(raw.pw_passwd) {
+            name: util::cstr_to_string(raw.pw_name)?,
+            password: match util::cstr_to_string(raw.pw_passwd) {
+                // Set to nullptr if user doesn't have a password
                 Ok(p) => Some(p),
-                Err(PwdError::NullPtr) => None,
+                Err(FfiError::InvalidPtr) => None,
                 Err(e) => return Err(e),
             },
             uid: raw.pw_uid,
             gid: raw.pw_gid,
-            gecos: match cstr_to_string(raw.pw_gecos) {
+            gecos: match util::cstr_to_string(raw.pw_gecos) {
                 Ok(p) => Some(p),
-                Err(PwdError::NullPtr) => None,
+                Err(FfiError::InvalidPtr) => None,
                 Err(e) => return Err(e),
             },
-            directory: cstr_to_string(raw.pw_dir)?,
-            shell: cstr_to_string(raw.pw_shell)?,
+            directory: util::cstr_to_string(raw.pw_dir)?,
+            shell: util::cstr_to_string(raw.pw_shell)?,
         })
     }
 
     /// Get a [`Passwd`] entry from a [`Uid`].
-    #[must_use]
-    pub fn from_uid(uid: Uid) -> PwdResult<Self> {
-        Self::from_raw(unsafe { libc::getpwuid(uid) })
+    pub fn from_uid(uid: Uid) -> Result<Self, FfiError> {
+        unsafe { Self::from_raw(libc::getpwuid(uid)) }
     }
 
     /// Get a [`Passwd`] entry from a user name.
-    #[must_use]
-    pub fn from_name(name: &str) -> PwdResult<Self> {
-        Self::from_raw(unsafe { libc::getpwnam(CString::new(name)?.as_ptr()) })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cstr_to_string() {
-        let cstr = ::std::ffi::CString::new("test\x123").unwrap();
-        assert_eq!(
-            &cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap()[..],
-            "test\x123"
-        )
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_cstr_to_string_nul() {
-        let cstr = ::std::ffi::CString::new("t\0est\x123").unwrap();
-        assert_eq!(
-            &cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap()[..],
-            "t\0est\x123"
-        )
+    pub fn from_name(name: &str) -> Result<Self, FfiError> {
+        unsafe { Self::from_raw(libc::getpwnam(CString::new(name)?.as_ptr())) }
     }
 }

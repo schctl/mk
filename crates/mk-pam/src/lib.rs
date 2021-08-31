@@ -4,9 +4,10 @@
 
 #![feature(vec_into_raw_parts)]
 
+use std::os::raw::{c_int, c_void};
 use std::{convert::TryFrom, ffi::CString};
 
-use libc::{c_int, c_void};
+use mk_common::errors::FfiError;
 
 pub mod conv;
 pub mod errors;
@@ -68,7 +69,7 @@ impl Handle {
             unsafe { ffi::pam_start(service_name.as_ptr(), user_name.as_ptr(), &conv, &mut pamh) };
 
         if pamh.is_null() {
-            return Err(PamError::NullPtr);
+            return Err(FfiError::InvalidPtr.into());
         }
 
         match RawError::try_from(ret as i32) {

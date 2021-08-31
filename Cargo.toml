@@ -1,5 +1,13 @@
 cargo-features = ["strip"]
 
+[workspace]
+members = [
+    "crates/mk-common",
+    "crates/mk-crypt",
+    "crates/mk-pam",
+    "crates/mk-pwd"
+]
+
 [package]
 name = "mk"
 
@@ -24,4 +32,5 @@ thiserror = "1.0"
 
 mk-pwd = { path = "crates/mk-pwd" }
 mk-pam = { path = "crates/mk-pam" }
-libcrypt-sys = { path = "crates/libcrypt-sys" }
+mk-crypt = { path = "crates/mk-crypt" }
+mk-common = { path = "crates/mk-common" }

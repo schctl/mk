@@ -194,10 +194,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1fa8cddc8fbbee11227ef194b5317ed014b8acbf15139bd716a18ad3fe99ec5"
 
 [[package]]
-name = "libcrypt-sys"
-version = "0.0.1"
-
-[[package]]
 name = "libloading"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -228,7 +224,8 @@ version = "0.0.1"
 dependencies = [
  "colored",
  "libc",
- "libcrypt-sys",
+ "mk-common",
+ "mk-crypt",
  "mk-pam",
  "mk-pwd",
  "rpassword",
@@ -237,12 +234,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "mk-common"
+version = "0.0.1"
+dependencies = [
+ "libc",
+ "num_enum",
+ "thiserror",
+]
+
+[[package]]
+name = "mk-crypt"
+version = "0.0.1"
+dependencies = [
+ "bindgen",
+ "mk-common",
+]
+
+[[package]]
 name = "mk-pam"
 version = "0.0.1"
 dependencies = [
  "bindgen",
  "lazy_static",
- "libc",
+ "mk-common",
  "num_enum",
  "thiserror",
 ]
@@ -252,7 +266,7 @@ name = "mk-pwd"
 version = "0.0.1"
 dependencies = [
  "libc",
- "thiserror",
+ "mk-common",
 ]
 
 [[package]]

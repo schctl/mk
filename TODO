@@ -1,8 +1,9 @@
- - [ ] `mk-common` crate, to hold all common functions so we can avoid duplicating code in this repo.
-    - Also common error types (maybe?)
- - [ ] README's for each crate.
+## 0.0.1
+
+ - [x] `mk-common` crate, to hold all common APIs so we can avoid duplicating code in this repo.
  - [ ] `scripts` for different uses.
  - [ ] Polish `env::Env` in the `mk` crate.
     - A more specific use case.
  - [ ] `Prompt` structure, something similar to a logger.
  - [ ] `bitflags` for `mk-pam`.
+ - [ ] Handle `crypt` and `pam` unavailability.

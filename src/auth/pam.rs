@@ -67,7 +67,7 @@ impl Authenticator for PamAuthenticator {
 
         if ret != pamffi::PAM_SUCCESS as c_int {
             println!("Failed to set PAM user {}", ret);
-            return Err(MkError::AuthError);
+            return Err(MkError::Auth);
         }
 
         // Authenticate user
@@ -76,7 +76,7 @@ impl Authenticator for PamAuthenticator {
         if ret != pamffi::PAM_SUCCESS as c_int {
             println!("Failed to authenticate user {}", ret);
             unsafe { pamffi::pam_end(handle.interior, ret) };
-            return Err(MkError::AuthError);
+            return Err(MkError::Auth);
         }
 
         // Check if the user's account is still active, and has permission to access the system
@@ -88,7 +88,7 @@ impl Authenticator for PamAuthenticator {
             if ret != pamffi::PAM_SUCCESS as c_int {
                 println!("Failed to authenticate user {}", ret);
                 unsafe { pamffi::pam_end(handle.interior, ret) };
-                return Err(MkError::AuthError);
+                return Err(MkError::Auth);
             }
         }
 

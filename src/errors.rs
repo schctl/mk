@@ -1,35 +1,34 @@
 //! Error types.
 
-use std::ffi::NulError;
-use std::str::Utf8Error;
-
-use thiserror::Error;
+use mk_common::errors::FfiError;
+use mk_pam::errors::PamError;
+use thiserror::Error as ThisError;
 
 /// All error types that we handle.
-#[derive(Error, Debug)]
+#[derive(ThisError, Debug)]
 pub enum MkError {
-    /// An interior nul byte was found.
-    #[error("An interior nul byte was found")]
-    NulError(#[from] NulError),
-    /// Error interpreting byte sequence as utf-8.
-    #[error("Error interpreting byte sequence as utf-8")]
-    Utf8Error(#[from] Utf8Error),
-    /// IO Error.
-    #[error("IO Error")]
-    IoError(#[from] std::io::Error),
+    /// PAM error.
+    #[error("PAM error")]
+    Pam(PamError),
+
+    /// FFI error.
+    #[error("FFI error")]
+    Ffi(FfiError),
+
     /// Error authenticating a user
     #[error("Error authenticating a user")]
-    AuthError,
-    /// A null pointer was found.
-    #[error("A null pointer was found")]
-    NullPtr,
+    Auth,
 }
 
-impl From<libcrypt_sys::StrError> for MkError {
-    fn from(e: libcrypt_sys::StrError) -> Self {
+impl<T> From<T> for MkError
+where
+    T: Into<PamError>,
+{
+    fn from(e: T) -> Self {
+        let e: PamError = e.into();
         match e {
-            libcrypt_sys::StrError::NulError(e) => Self::NulError(e),
-            libcrypt_sys::StrError::Utf8Error(e) => Self::Utf8Error(e),
+            PamError::Ffi(f) => Self::Ffi(f),
+            _ => Self::Pam(e),
         }
     }
 }
