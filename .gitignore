@@ -12,3 +12,5 @@ target/
 mk
 .vscode
 .idea
+
+crates/*/Cargo.lock

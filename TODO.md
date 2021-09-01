@@ -1,9 +1,9 @@
 ## 0.0.1
 
  - [x] `mk-common` crate, to hold all common APIs so we can avoid duplicating code in this repo.
- - [ ] `scripts` for different uses.
- - [ ] Polish `env::Env` in the `mk` crate.
-    - A more specific use case.
+ - [x] `scripts` for different uses.
+ - [x] Clean `env::Env` in the `mk` crate.
  - [ ] `Prompt` structure, something similar to a logger.
  - [ ] `bitflags` for `mk-pam`.
  - [ ] Handle `crypt` and `pam` unavailability.
+ - [ ] `Clap` for argument parsing.

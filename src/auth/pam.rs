@@ -1,4 +1,6 @@
-//! User authenticator using PAM.
+//! User authenticator using [`PAM`].
+//!
+//! [`PAM`]: https://en.wikipedia.org/wiki/Pluggable_authentication_module
 
 use std::ffi::CString;
 use std::os::raw::{c_int, c_void};

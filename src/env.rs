@@ -1,90 +1,77 @@
 //! Environment setup utilities for running a command.
 
 use std::collections::HashMap;
+use std::os::unix::process::CommandExt;
+use std::process::Command;
 
+use crate::auth::{self, Authenticator};
+use crate::config::Config;
 use crate::prelude::*;
 
-/// Command execution environment.
-///
-/// This is passed to [`crate::command::CommandExecutor`] and wraps all execution details, such
-/// as the user's `mk` config, options, target user, environment variables, and arguments.
+/// The execution environment.
 pub struct Env {
-    pub origin: mk_pwd::Passwd,
-    pub target: mk_pwd::Passwd,
-    args: Vec<String>,
-    vars: HashMap<String, String>,
+    authenticator: Box<dyn Authenticator>,
+    origin: mk_pwd::Passwd,
+    _config: Config,
 }
 
 impl Env {
+    /// Create a new execution environment with the current user.
     #[must_use]
-    pub fn new(origin: mk_pwd::Passwd, target: mk_pwd::Passwd) -> Self {
+    pub fn new(_config: Config) -> Self {
         Self {
-            origin,
-            target,
-            args: Vec::new(),
-            vars: HashMap::new(),
+            // This will be created after reading the config later.
+            authenticator: Box::new(auth::pam::PamAuthenticator::new()),
+            origin: mk_pwd::Passwd::from_uid(util::get_uid()).unwrap(),
+            _config,
         }
     }
 
-    /// Initialize argument list from existing environment.
-    pub fn init_args(&mut self) -> MkResult<()> {
-        let mut args = std::env::args();
+    /// Verify that the current user is authenticated and is allowed to run as the target.
+    /// `Err` is returned if the verification failed.
+    pub fn verify(&mut self, _target: &mk_pwd::Passwd) -> MkResult<()> {
+        self.authenticator.authenticate(&self.origin)?;
 
-        // First arg is path to this binary.
-        let _ = args.next();
+        // TODO:
+        // check if `origin` is allowed to execute as `target` from the config.
 
-        if args.next().is_some() {
-            self.args = Vec::with_capacity(args.len());
+        return Ok(());
+    }
 
-            for i in args {
-                self.push_arg(&i[..])?;
+    /// Run a command as a `target` user, if the environment is verified.
+    pub fn exec(&mut self, cmd: &str, args: Vec<String>, target: &mk_pwd::Passwd) -> MkError {
+        // ---------- Create environment variables ---------- //
+
+        let mut vars = HashMap::new();
+
+        let path = mk_common::util::get_path();
+        vars.insert("USER", &target.name[..]);
+        vars.insert("HOME", &target.directory[..]);
+        vars.insert("SHELL", &target.shell[..]);
+        vars.insert("PATH", &path[..]);
+        vars.insert("LOGNAME", &target.name[..]);
+
+        // ---------- Execute the command ---------- //
+
+        match self.verify(&target) {
+            Ok(_) => {
+                let mut command = Command::new(cmd);
+
+                // Set arguments
+                command.args(args);
+
+                // Clear environment and set new variables
+                command.env_clear();
+                command.envs(vars);
+
+                // Set ids
+                command.uid(target.uid);
+                command.gid(target.gid);
+
+                // Execute the command
+                command.exec().into()
             }
+            Err(e) => e,
         }
-
-        Ok(())
-    }
-
-    /// Initialize basic environment variable list.
-    pub fn init_vars(&mut self) -> MkResult<()> {
-        let target = self.target.clone();
-
-        self.push_var("USER", &target.name[..])?;
-        self.push_var("HOME", &target.directory[..])?;
-        self.push_var("SHELL", &target.shell[..])?;
-
-        self.push_var(
-            "PATH",
-            &if let Some(p) = std::env::vars().find(|p| p.0 == "PATH") {
-                p.1
-            } else {
-                String::from("/usr/local/sbin:/usr/local/bin:/usr/bin")
-            }[..],
-        )?;
-
-        self.push_var("LOGNAME", &target.name[..])?;
-
-        Ok(())
-    }
-
-    /// Push an argument.
-    pub fn push_arg(&mut self, arg: &str) -> MkResult<()> {
-        self.args.push(String::from(arg));
-        Ok(())
-    }
-
-    /// Push a key value pair to the environment variable list.
-    pub fn push_var(&mut self, key: &str, val: &str) -> MkResult<()> {
-        self.vars.insert(key.to_string(), val.to_string());
-        Ok(())
-    }
-
-    /// Get environment argument list.
-    pub fn get_args(&self) -> &[String] {
-        &self.args[..]
-    }
-
-    /// Get environment variable list.
-    pub fn get_vars(&self) -> &HashMap<String, String> {
-        &self.vars
     }
 }

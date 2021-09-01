@@ -3,14 +3,15 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_int, c_void};
+use std::os::raw::{c_char, c_int, c_void};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 use mk_common::errors::FfiError;
+use mk_common::util;
 
 use crate::ffi;
-use crate::prelude::*;
+use crate::errors::*;
 
 lazy_static! {
     /// Global conversation function pointers.
@@ -126,7 +127,7 @@ pub(crate) extern "C" fn __raw_pam_conv(
             let raw_msg = unsafe { *raw_msgs.offset(i) };
 
             // Create message
-            let contents = match unsafe { util::cstr_to_string((*raw_msg).msg) } {
+            let contents = match unsafe { util::cstr_to_string((*raw_msg).msg as *mut c_char) } {
                 Ok(s) => s,
                 // I DON'T KNOW IF THESE RETURN CODES ARE CORRECT
                 // (but it should be fine for now)

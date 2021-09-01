@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 use mk_pwd::Uid;
 
 use super::Authenticator;
-
 use crate::prelude::*;
 
 /// Holds all the information required for authentication using `/etc/shadow`.
@@ -16,7 +15,7 @@ pub struct ShadowAuthenticator {
 }
 
 impl ShadowAuthenticator {
-#[must_use]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             users: HashMap::new(),

@@ -12,9 +12,7 @@ use mk_common::errors::FfiError;
 pub mod conv;
 pub mod errors;
 
-mod prelude;
-pub(crate) mod util;
-use prelude::*;
+use errors::*;
 
 /// Raw bindings to PAM headers.
 pub mod ffi {

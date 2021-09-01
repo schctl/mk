@@ -1,17 +1,21 @@
 # mk (^∇^)-b
 
 
-***
-
 `mk` is a tool to run unix commands as another user, and a family of crates. It is similar to [`doas`](https://github.com/Duncaen/OpenDoas) or [`sudo`](https://github.com/sudo-project/sudo).
+
+---
 
 ### Building
 
-Rust's' `nightly` toolchain is required. The only version that this has been tested with is `1.56.0-nightly`.
+Rust's `nightly` toolchain is required. The only version that this has been tested with is `1.56.0-nightly`.
 
 The `build.sh` script will build `mk` and create a copy in the project's root, with permissions setup for testing.
 
-***
+### Installation
+
+The `install.sh` script will install `mk` for you.
+
+---
 
 
 ### Disclaimers
