@@ -6,4 +6,4 @@
  - [ ] `Prompt` structure, something similar to a logger.
  - [ ] `bitflags` for `mk-pam`.
  - [ ] Handle `crypt` and `pam` unavailability.
- - [ ] `Clap` for argument parsing.
+ - [x] `Clap` for argument parsing.

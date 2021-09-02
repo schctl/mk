@@ -30,8 +30,7 @@ else
 fi
 
 # Copy `mk`
-rm -f ./$BIN
-cp target/$MODE/$BIN $BIN
+cp -f target/$MODE/$BIN $BIN
 
 # Set permissions
 $PRIV chown root ./$BIN

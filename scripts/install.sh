@@ -22,8 +22,7 @@ fi
 cargo build --release
 
 # Copy `mk`
-rm -f $OUT/$BIN
-$PRIV cp target/$MODE/$BIN $OUT/$BIN
+$PRIV cp -f target/$MODE/$BIN $OUT/$BIN
 
 # Set permissions
 $PRIV chown root $OUT/$BIN

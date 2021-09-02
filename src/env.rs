@@ -6,6 +6,7 @@ use std::process::Command;
 
 use crate::auth::{self, Authenticator};
 use crate::config::Config;
+use crate::options::MkOptions;
 use crate::prelude::*;
 
 /// The execution environment.
@@ -38,21 +39,30 @@ impl Env {
         return Ok(());
     }
 
+    /// Run the appropriate method for given options.
+    pub fn run(&mut self, options: MkOptions) -> MkResult<()> {
+        match options {
+            MkOptions::Command(cmd) => Err(self.exec(
+                &cmd.command[..],
+                cmd.args,
+                cmd.env,
+                &mk_pwd::Passwd::from_name(&cmd.target[..])?,
+            )),
+            MkOptions::Help(help) => {
+                println!("{}", help);
+                Ok(())
+            }
+        }
+    }
+
     /// Run a command as a `target` user, if the environment is verified.
-    pub fn exec(&mut self, cmd: &str, args: Vec<String>, target: &mk_pwd::Passwd) -> MkError {
-        // ---------- Create environment variables ---------- //
-
-        let mut vars = HashMap::new();
-
-        let path = mk_common::util::get_path();
-        vars.insert("USER", &target.name[..]);
-        vars.insert("HOME", &target.directory[..]);
-        vars.insert("SHELL", &target.shell[..]);
-        vars.insert("PATH", &path[..]);
-        vars.insert("LOGNAME", &target.name[..]);
-
-        // ---------- Execute the command ---------- //
-
+    pub fn exec(
+        &mut self,
+        cmd: &str,
+        args: Vec<String>,
+        env: Option<HashMap<String, String>>,
+        target: &mk_pwd::Passwd,
+    ) -> MkError {
         match self.verify(&target) {
             Ok(_) => {
                 let mut command = Command::new(cmd);
@@ -61,8 +71,10 @@ impl Env {
                 command.args(args);
 
                 // Clear environment and set new variables
-                command.env_clear();
-                command.envs(vars);
+                if let Some(vars) = env {
+                    command.env_clear();
+                    command.envs(vars);
+                }
 
                 // Set ids
                 command.uid(target.uid);

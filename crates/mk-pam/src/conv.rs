@@ -10,8 +10,8 @@ use lazy_static::lazy_static;
 use mk_common::errors::FfiError;
 use mk_common::util;
 
-use crate::ffi;
 use crate::errors::*;
+use crate::ffi;
 
 lazy_static! {
     /// Global conversation function pointers.
