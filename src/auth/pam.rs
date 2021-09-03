@@ -25,7 +25,7 @@ impl PamAuthenticator {
 
 impl Authenticator for PamAuthenticator {
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
-        let username_str = String::from(&user.name[..]);
+        let username_str = user.name.clone();
         let username = CString::new(&user.name[..])?;
 
         // Create conversation function
@@ -33,11 +33,11 @@ impl Authenticator for PamAuthenticator {
             conv: Box::new(move |msg| match msg {
                 pam::conv::Message::PromptEcho(m) | pam::conv::Message::Prompt(m) => {
                     Some(pam::conv::Response {
-                        resp: match prompt::prompt(
-                            &username_str[..],
-                            &m[..],
+                        resp: match prompt!(
                             m.to_lowercase().contains("password"),
-                            true,
+                            "[{}] {}",
+                            username_str,
+                            m
                         ) {
                             Ok(p) => p,
                             Err(_) => return None,

@@ -1,20 +1,20 @@
 #![doc = include_str!("../README.md")]
+#![feature(never_type)]
 
+#[macro_use]
+mod prompt;
+
+mod app;
 #[allow(unused)]
 mod auth;
+mod cli;
 mod config;
-mod env;
 mod errors;
 mod options;
 mod prelude;
-mod prompt;
 pub mod util;
 
-use config::Config;
-use env::Env;
-use options::MkOptions;
-
 fn main() {
-    let mut env = Env::new(Config {});
-    env.run(MkOptions::new()).unwrap();
+    let mut app = app::App::new(config::Config {}).unwrap();
+    app.run(cli::options_from_terminal().unwrap()).unwrap();
 }

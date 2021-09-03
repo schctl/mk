@@ -3,6 +3,7 @@
 //! This crate provides **experimental** safe interfaces to PAM as well.
 
 #![feature(vec_into_raw_parts)]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use std::os::raw::{c_int, c_void};
 use std::{convert::TryFrom, ffi::CString};

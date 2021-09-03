@@ -29,8 +29,3 @@ pub enum FfiError {
     #[error("IO Error")]
     IoError(#[from] io::Error),
 }
-
-/// Get the system `errno`.
-pub fn errno() -> i32 {
-    unsafe { (*libc::__errno_location()) as i32 }
-}

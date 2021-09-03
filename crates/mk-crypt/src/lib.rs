@@ -1,5 +1,7 @@
 //! Bindings for Unix's `libcrypt`.
 
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::atomic::{AtomicBool, Ordering};

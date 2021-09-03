@@ -22,3 +22,18 @@ pub trait Authenticator {
     /// [`MkError`] - any other error.
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> Result<(), MkError>;
 }
+
+pub enum Supported {
+    /// [`pam::PamAuthenticator`] authentication.
+    Pam,
+    /// [`shadow::ShadowAuthenticator`] authentication.
+    Shadow,
+}
+
+/// Create a new authenticator from the supported types.
+pub fn new_authenticator(_type: Supported) -> MkResult<Box<dyn Authenticator>> {
+    Ok(match _type {
+        Supported::Pam => Box::new(pam::PamAuthenticator::new()),
+        Supported::Shadow => Box::new(shadow::ShadowAuthenticator::new()),
+    })
+}
