@@ -1,7 +1,11 @@
 //! User authentication agents.
 
+pub mod passwd;
+
+#[cfg(feature = "pam")]
 pub mod pam;
-pub mod shadow;
+
+use mk_common::*;
 
 use crate::prelude::*;
 
@@ -23,17 +27,26 @@ pub trait Authenticator {
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()>;
 }
 
+/// All supported authenticator types.
+///
+/// Not checked for whether they are enabled through a feature.
 pub enum Supported {
     /// [`pam::PamAuthenticator`] authentication.
     Pam,
-    /// [`shadow::ShadowAuthenticator`] authentication.
-    Shadow,
+    /// [`passwd::PasswdAuthenticator`] authentication.
+    Passwd,
 }
 
 /// Create a new authenticator from the supported types.
-pub fn new_authenticator(_type: Supported) -> MkResult<Box<dyn Authenticator>> {
+///
+/// This returns [`FfiError::ResourceUnavailable`] if the feature for the given type of authenticator
+/// has not been specified.
+pub fn new(_type: Supported) -> MkResult<Box<dyn Authenticator>> {
     Ok(match _type {
+        #[cfg(feature = "pam")]
         Supported::Pam => Box::new(pam::PamAuthenticator::new()),
-        Supported::Shadow => Box::new(shadow::ShadowAuthenticator::new()),
+        // Passwd guaranteed to be available.
+        Supported::Passwd => Box::new(passwd::PasswdAuthenticator::new()),
+        _ => return Err(MkError::Ffi(FfiError::ResourceUnavailable)),
     })
 }

@@ -28,7 +28,7 @@ pub mod ffi {
 /// * [`FfiError::InvalidPtr`] - Failed to hash the passphrase. This can occur if the system
 ///   does not support `crypt` at runtime as well.
 ///
-/// See <https://manpages.debian.org/unstable/libcrypt-dev/crypt.3.en.html> for more.
+/// See <https://linux.die.net/man/3/crypt> for more.
 pub fn crypt<'a>(phrase: &'a str, setting: &'a str) -> Result<&'a str, FfiError> {
     // Maybe check if passphrase starts with `*` and return `InvalidPtr`?
     //
@@ -85,8 +85,8 @@ mod tests {
     }
 
     /// When calling `crypt` from multiple threads at the same time, the output must always be either
-    // an [`Ffi::InvalidPtr`] - indicating that another thread has called `crypt` first,
-    /// or the correct hash, but never an invalid hash.
+    /// an [`Ffi::InvalidPtr`] - indicating that another thread has called `crypt` first, or the
+    /// correct hash, but never an invalid hash.
     fn test_concurrent_crypt() {
         const RUNS: usize = 1_000;
         const THREADS: usize = 4;

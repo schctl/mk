@@ -1,4 +1,6 @@
-//! User authentication using `/etc/shadow`.
+//! User authentication using `/etc/passwd`.
+//!
+//! This is the fallback authenticator type, and is available on all platforms.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -8,13 +10,13 @@ use mk_pwd::Uid;
 use super::Authenticator;
 use crate::prelude::*;
 
-/// Holds all the information required for authentication using `/etc/shadow`.
-pub struct ShadowAuthenticator {
+/// Holds all the information required for authentication using `/etc/passwd`.
+pub struct PasswdAuthenticator {
     /// List of all authenticated users and when they were authenticated.
     users: HashMap<Uid, Instant>,
 }
 
-impl ShadowAuthenticator {
+impl PasswdAuthenticator {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -23,7 +25,7 @@ impl ShadowAuthenticator {
     }
 }
 
-impl Authenticator for ShadowAuthenticator {
+impl Authenticator for PasswdAuthenticator {
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
         // Check if user is in the list of authenticated users.
         if let Some(u) = self.users.get(&user.uid) {
@@ -40,16 +42,20 @@ impl Authenticator for ShadowAuthenticator {
             None => return Ok(()),
         };
 
-        if password == "x" {
-            // On most systems, this is set to 'x' and the actual password is stored in `/etc/shadow/`.
-            password = match shadow::Shadow::from_name(&user.name[..]) {
-                Some(s) => s.password,
+        let password = match &password[..] {
+            "*" => return Err(MkError::Auth),
+            // > On most modern systems, this field is set to x, and the user password is stored in
+            // > the /etc/shadow file.
+            #[cfg(feature = "sdw")]
+            "x" => match shadow::Shadow::from_name(&user.name[..]) {
+                Some(s) => match &s.password[..] {
+                    "*" | "!" => return Err(MkError::Auth),
+                    _ => s.password,
+                },
                 None => return Ok(()),
-            }
-        } else if password == "*" {
-            // Prevent login.
-            return Err(MkError::Auth);
-        }
+            },
+            _ => password,
+        };
 
         let auth_password = prompt!(true, "[{}] Password: ", user.name)?;
 

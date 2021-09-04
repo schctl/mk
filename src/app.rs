@@ -17,7 +17,11 @@ impl App {
     pub fn new(_config: Config) -> MkResult<Self> {
         Ok(Self {
             _config,
-            authenticator: auth::new_authenticator(auth::Supported::Pam)?,
+            // TODO: this will be parsed from `_config` later on.
+            #[cfg(feature = "pam")]
+            authenticator: auth::new(auth::Supported::Pam)?,
+            #[cfg(not(feature = "pam"))]
+            authenticator: auth::new(auth::Supported::Passwd)?,
         })
     }
 

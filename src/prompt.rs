@@ -14,7 +14,7 @@
 /// [{module_path}] {msg}
 /// ```
 ///
-/// If `pwd` is true, a string is read as a password.
+/// If `$pwd` is true, a string is read as a password.
 macro_rules! prompt {
     ($pwd:expr, $($arg:tt)*) => {
         {

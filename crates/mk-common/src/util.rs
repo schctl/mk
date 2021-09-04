@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 
 use crate::errors::*;
 
-/// Convert from a C *[`c_char`] to a Rust [`String`] safely.
+/// Convert from a `C` [`*c_char`](c_char) to a Rust [`String`] safely.
 pub fn cstr_to_string(ptr: *mut c_char) -> Result<String, FfiError> {
     if ptr.is_null() {
         return Err(FfiError::InvalidPtr);

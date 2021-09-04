@@ -24,12 +24,24 @@ codegen-units = 1
 [dependencies]
 libc = "0.2"
 
-clap = "3.0.0-beta.4"
 rpassword = "5.0"
 thiserror = "1.0"
+clap = "3.0.0-beta.4"
 
-shadow = "0.0.1"
-mk-pwd = { path = "crates/mk-pwd" }
-mk-pam = { path = "crates/mk-pam" }
-mk-crypt = { path = "crates/mk-crypt" }
 mk-common = { path = "crates/mk-common" }
+
+mk-pwd = { path = "crates/mk-pwd" }
+shadow = { version = "0.0.1", optional = true }
+mk-pam = { path = "crates/mk-pam", optional = true }
+mk-crypt = { path = "crates/mk-crypt" }
+
+[features]
+# Pam authentication.
+pam = ["mk-pam"]
+
+# Shadow file authentication.
+#
+# The default authenticator is [`auth::passwd`], which is available on all platforms (POSIX defines `pwd.h`).
+# In some cases, the user's password is defined in `/etc/shadow` instead, which we access through `shadow.h`,
+# and may not be available on all systems, so we need to define a feature for it.
+sdw = ["shadow"]

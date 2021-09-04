@@ -1,4 +1,4 @@
-//! Raw interface to PAM (Pluggable Authentication Modules).
+//! Rust interface to PAM (Pluggable Authentication Modules).
 //!
 //! This crate provides **experimental** safe interfaces to PAM as well.
 

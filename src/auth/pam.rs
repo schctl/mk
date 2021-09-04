@@ -1,31 +1,46 @@
-//! User authenticator using [`PAM`].
+//! User authentication using [`PAM`].
 //!
 //! [`PAM`]: https://en.wikipedia.org/wiki/Pluggable_authentication_module
 
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::os::raw::{c_int, c_void};
+use std::time::{Duration, Instant};
 
 use mk_pam as pam;
-use mk_pam::ffi as pamffi;
+use mk_pwd::Uid;
 
 use super::Authenticator;
 use crate::prelude::*;
 use crate::prompt;
 
 /// PAM authentication structure. Holds all data required to begin a session with PAM.
-pub struct PamAuthenticator {}
+pub struct PamAuthenticator {
+    /// List of all authenticated users and when they were authenticated.
+    users: HashMap<Uid, Instant>,
+}
 
 impl PamAuthenticator {
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            users: HashMap::new(),
+        }
     }
 }
 
 impl Authenticator for PamAuthenticator {
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
+        // Check if user is in the list of authenticated users.
+        if let Some(u) = self.users.get(&user.uid) {
+            if Instant::now() - *u < Duration::from_secs(600) {
+                return Ok(());
+            } else {
+                self.users.remove(&user.uid);
+            }
+        }
+
         let username_str = user.name.clone();
-        let username = CString::new(&user.name[..])?;
 
         // Create conversation function
         let conv = pam::conv::Conversation {

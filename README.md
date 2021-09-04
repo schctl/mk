@@ -5,15 +5,28 @@
 
 ---
 
-### Building
+### Requirements
 
-Rust's `nightly` toolchain is required. The only version that this has been tested with is `1.56.0-nightly`.
+ - Rust's nightly toolchain (1.56 or higher)
+ - Python
 
-The `build.sh` script will build `mk` and create a copy in the project's root, with permissions setup for testing.
+### `x.py`
 
-### Installation
+`x.py` is a helper script to help build, test and install `mk`. Use `./x.py -h` to see all options.
 
-The `install.sh` script will install `mk` for you.
+### Examples
+
+**Clean build artifacts and reubild `mk`**
+
+```sh
+$ ./x.py --clean --build
+```
+
+**install `mk`**
+
+```sh
+$ ./x.py --install
+```
 
 ---
 

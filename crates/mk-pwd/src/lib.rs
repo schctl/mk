@@ -1,4 +1,4 @@
-//! Interface to Unix's `pwd.h`.
+//! Rust interface to Unix's `pwd.h`.
 
 use std::ffi::CString;
 
@@ -7,10 +7,12 @@ use mk_common::*;
 pub type Uid = libc::uid_t;
 pub type Gid = libc::gid_t;
 
+/// A single entry in `/etc/passwd`.
+///
 /// The `/etc/passwd` file is a text file that describes user login accounts for the system.
 /// Each line of the file describes a single user, this struct is a representation of each entry.
 ///
-/// See <https://www.man7.org/linux/man-pages/man5/passwd.5.html> for more.
+/// See <https://linux.die.net/man/5/passwd> for more.
 #[derive(Debug, Clone)]
 pub struct Passwd {
     /// User's login name.
