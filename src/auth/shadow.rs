@@ -51,9 +51,7 @@ impl Authenticator for ShadowAuthenticator {
             return Err(MkError::Auth);
         }
 
-        let auth_password =
-            rpassword::prompt_password_stdout(&format!("[mk] password for {} > ", user.name)[..])
-                .unwrap();
+        let auth_password = prompt!(true, "[{}] Password: ", user.name)?;
 
         if password != mk_crypt::crypt(&auth_password, &password)? {
             return Err(MkError::Auth);

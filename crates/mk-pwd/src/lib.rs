@@ -2,7 +2,7 @@
 
 use std::ffi::CString;
 
-use mk_common::{errors::FfiError, util};
+use mk_common::*;
 
 pub type Uid = libc::uid_t;
 pub type Gid = libc::gid_t;
@@ -36,7 +36,7 @@ impl Passwd {
     ///
     /// # Errors
     ///
-    /// [`PwdError::InvalidPtr`] - usually when an entry is non existent.
+    /// [`FfiError::InvalidPtr`] - usually when an entry is non existent.
     ///
     /// # Safety
     ///

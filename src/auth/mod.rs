@@ -18,9 +18,9 @@ pub trait Authenticator {
     ///
     /// # Errors
     ///
-    /// [`MkError::AuthError`] - if the user failed the authentication.
+    /// [`MkError::Auth`] - if the user failed the authentication.
     /// [`MkError`] - any other error.
-    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> Result<(), MkError>;
+    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()>;
 }
 
 pub enum Supported {

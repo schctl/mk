@@ -1,6 +1,6 @@
 //! Error types.
 
-use mk_common::errors::*;
+use mk_common::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use thiserror::Error as ThisError;
 
@@ -163,7 +163,7 @@ pub enum RawError {
     /// Incomplete authentication stack.
     ///
     /// Verify that the conversation is completed, and call the function again
-    /// to complete the authentication stack
+    /// to complete the authentication stack.
     #[error("Incomplete authentication stack")]
     Incomplete = ffi::PAM_INCOMPLETE as i32,
 }

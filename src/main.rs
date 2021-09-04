@@ -9,10 +9,12 @@ mod app;
 mod auth;
 mod cli;
 mod config;
-mod errors;
+pub mod errors;
 mod options;
 mod prelude;
 pub mod util;
+
+pub use errors::*;
 
 fn main() {
     let mut app = app::App::new(config::Config {}).unwrap();

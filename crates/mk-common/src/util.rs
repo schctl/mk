@@ -36,12 +36,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_cstr_to_string_nul() {
-        let cstr = ::std::ffi::CString::new("t\0est\x123").unwrap();
-        assert_eq!(
-            &cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap()[..],
-            "t\0est\x123"
-        )
+    fn test_cstr_from_nullptr() {
+        match cstr_to_string(::std::ptr::null_mut()) {
+            Ok(_) => panic!("Null pointer conversion somehow succeeded?"),
+            Err(e) => match e {
+                FfiError::InvalidPtr => {}
+                _ => panic!("Null pointer conversion error is not invalid ptr."),
+            },
+        }
     }
 }

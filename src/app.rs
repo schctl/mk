@@ -38,7 +38,7 @@ impl App {
         }
     }
 
-    /// Run a command as a `target` user, if the environment is verified.
+    /// Execute a command with the given `options`.
     pub fn exec(&mut self, options: CommandOptions) -> MkResult<!> {
         self.authenticator.authenticate(&options.origin()?)?;
 

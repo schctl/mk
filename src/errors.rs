@@ -1,7 +1,7 @@
 //! Error types.
 
-use mk_common::errors::FfiError;
-use mk_pam::errors::PamError;
+use mk_common::FfiError;
+use mk_pam::{PamError, RawError};
 use thiserror::Error as ThisError;
 
 /// All error types that we handle.
@@ -9,7 +9,7 @@ use thiserror::Error as ThisError;
 pub enum MkError {
     /// PAM error.
     #[error("PAM error")]
-    Pam(PamError),
+    Pam(RawError),
 
     /// FFI error.
     #[error("FFI error")]
@@ -28,7 +28,7 @@ where
         let e: PamError = e.into();
         match e {
             PamError::Ffi(f) => Self::Ffi(f),
-            _ => Self::Pam(e),
+            PamError::Raw(f) => Self::Pam(f),
         }
     }
 }
