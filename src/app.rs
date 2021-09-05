@@ -21,7 +21,7 @@ impl App {
             #[cfg(feature = "pam")]
             authenticator: auth::new(auth::Supported::Pam)?,
             #[cfg(not(feature = "pam"))]
-            authenticator: auth::new(auth::Supported::Passwd)?,
+            authenticator: auth::new(auth::Supported::Pwd)?,
         })
     }
 

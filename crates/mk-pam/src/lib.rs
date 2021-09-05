@@ -146,7 +146,7 @@ impl Handle {
                 as i32;
 
         if pamh.is_null() {
-            return Err(FfiError::InvalidPtr.into());
+            nullptr_bail!();
         };
 
         match RawError::try_from(ret as i32) {

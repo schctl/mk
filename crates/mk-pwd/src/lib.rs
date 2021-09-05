@@ -1,6 +1,7 @@
 //! Rust interface to Unix's `pwd.h`.
 
 use std::ffi::CString;
+use std::io;
 
 use mk_common::*;
 
@@ -43,9 +44,9 @@ impl Passwd {
     /// # Safety
     ///
     /// `ptr` must be a valid pointer to a [`libc::passwd`].
-    pub unsafe fn from_raw(ptr: *mut libc::passwd) -> Result<Self, FfiError> {
+    pub unsafe fn from_raw(ptr: *mut libc::passwd) -> io::Result<Self> {
         if ptr.is_null() {
-            return Err(FfiError::InvalidPtr);
+            nullptr_bail!();
         }
 
         let raw = *ptr;
@@ -55,15 +56,13 @@ impl Passwd {
             password: match util::cstr_to_string(raw.pw_passwd) {
                 // Set to nullptr if user doesn't have a password
                 Ok(p) => Some(p),
-                Err(FfiError::InvalidPtr) => None,
-                Err(e) => return Err(e),
+                Err(_) => None,
             },
             uid: raw.pw_uid,
             gid: raw.pw_gid,
             gecos: match util::cstr_to_string(raw.pw_gecos) {
                 Ok(p) => Some(p),
-                Err(FfiError::InvalidPtr) => None,
-                Err(e) => return Err(e),
+                Err(_) => None,
             },
             directory: util::cstr_to_string(raw.pw_dir)?,
             shell: util::cstr_to_string(raw.pw_shell)?,
@@ -71,12 +70,12 @@ impl Passwd {
     }
 
     /// Get a [`Passwd`] entry from a [`Uid`].
-    pub fn from_uid(uid: Uid) -> Result<Self, FfiError> {
+    pub fn from_uid(uid: Uid) -> io::Result<Self> {
         unsafe { Self::from_raw(libc::getpwuid(uid)) }
     }
 
     /// Get a [`Passwd`] entry from a user name.
-    pub fn from_name(name: &str) -> Result<Self, FfiError> {
+    pub fn from_name(name: &str) -> io::Result<Self> {
         unsafe { Self::from_raw(libc::getpwnam(CString::new(name)?.as_ptr())) }
     }
 }

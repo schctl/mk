@@ -1,6 +1,9 @@
 //! Error types.
 
-use mk_common::*;
+use std::ffi::NulError;
+use std::io;
+use std::str::Utf8Error;
+
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use thiserror::Error as ThisError;
 
@@ -15,17 +18,23 @@ pub enum PamError {
     #[error("Raw PAM error code")]
     Raw(#[from] RawError),
 
-    /// FFI error.
-    #[error("FFI error")]
-    Ffi(FfiError),
+    /// IO Error.
+    #[error("IO error")]
+    Io(#[from] io::Error),
 }
 
-impl<T> From<T> for PamError
-where
-    T: Into<FfiError>,
-{
-    fn from(e: T) -> Self {
-        Self::Ffi(e.into())
+impl From<Utf8Error> for PamError {
+    fn from(_: Utf8Error) -> Self {
+        Self::Io(io::Error::new(io::ErrorKind::InvalidData, "invalid utf-8"))
+    }
+}
+
+impl From<NulError> for PamError {
+    fn from(_: NulError) -> Self {
+        Self::Io(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "interior nul-byte found",
+        ))
     }
 }
 

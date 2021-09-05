@@ -1,31 +1,17 @@
-//! Error types.
+//! Error handling tools.
 
-use std::ffi::NulError;
-use std::io;
-use std::str::Utf8Error;
+/// Convenient exit for when a null pointer is encountered.
+#[macro_export]
+macro_rules! nullptr_bail {
+    () => {
+        return Err(::std::io::Error::new(::std::io::ErrorKind::InvalidData, "null pointer").into())
+    };
+}
 
-use thiserror::Error as ThisError;
-
-/// Commonly encountered error types.
-#[derive(ThisError, Debug)]
-pub enum FfiError {
-    /// An interior nul byte was found.
-    #[error("Interior nul byte")]
-    NulByte(#[from] NulError),
-
-    /// UTF-8 conversion error.
-    #[error("UTF-8 error")]
-    Utf8(#[from] Utf8Error),
-
-    /// An invalid pointer was encountered (can be null).
-    #[error("Invalid pointer")]
-    InvalidPtr,
-
-    /// A resource is unavailable at this time.
-    #[error("Resource unavailable")]
-    ResourceUnavailable,
-
-    /// IO Error.
-    #[error("IO Error")]
-    IoError(#[from] io::Error),
+/// Convinient exit for when an operation is not permitted.
+#[macro_export]
+macro_rules! auth_bail {
+    ($val:expr) => {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, $val).into())
+    };
 }

@@ -13,7 +13,6 @@ from typing import Any, Dict, List
 
 
 # Constants
-# ---------
 
 # Binary target
 BIN = 'mk'
@@ -25,7 +24,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 OLD = os.getcwd()
 
 # Temporary build files
-TMP = f'{DIR}/_build'
+TMP = f'{DIR}/_tmp_build'
 
 # Privilege giving binary
 SUID = ''
@@ -45,14 +44,6 @@ FEATURES = {
     'pam': {
         'headers': ['security/pam_appl'],
         'dylibs': ['pam']
-    },
-    'mk-pam/linux-pam': {
-        'features': ['pam'],
-        'defs': ['__LINUX_PAM__']
-    },
-    'mk-pam/open-pam': {
-        'features': ['pam'],
-        'defs': ['OPENPAM']
     }
 }
 
@@ -106,19 +97,6 @@ def maybe_feature(feat: str) -> Dict[str, Any]:
     defs = []
 
     if feat in FEATURES:
-        # Walk through feature dependencies and collect requirements
-        if 'features' in FEATURES[feat]:
-            for f in FEATURES[feat]['features']:
-                if f in FEATURES:
-                    x = maybe_feature(f)
-
-                    if not x:
-                        return None
-
-                    links.extend(x['links'])
-                    headers.extend(x['headers'])
-                    defs.extend(x['defs'])
-
         # Get required libraries to link to
         if 'links' in FEATURES[feat]:
             links.extend(FEATURES[feat]['links'])
@@ -182,14 +160,6 @@ def cargo(cmd: str, *args, **kwargs) -> int:
     return os.system(cmd)
 
 
-def clean():
-    cargo('clean')
-
-
-def test(feats: List[str]):
-    cargo('test', '--workspace', features=feats)
-
-
 def build(bin: str, rel: bool, feats: List[str]) -> str:
     print(f"Building ``{bin}`` with features: {feats} ...")
 
@@ -234,6 +204,8 @@ def setup() -> argparse.ArgumentParser:
                         type=str, help="Mode to build the binary in.")
     parser.add_argument('--install', action='store_true',
                         help="Install the binary to ``/usr/bin``.")
+    parser.add_argument('--clippy', action='store_true',
+                        help="Run ``cargo-clippy`` with specified features.")
     parser.add_argument('--features', nargs='?', const='', type=str,
                         help="Override default features to build the binary with, with no checks.")
     parser.add_argument('--perms', action='store_true',
@@ -260,17 +232,17 @@ def main():
 
     if args.bin:
         current_bin = args.bin
+    if args.clippy:
+        cargo('clippy', features=features)
     if args.clean:
-        clean()
+        cargo('clean')
     if args.test:
-        test(features)
-
+        cargo('test', '--workspace', features=features)
     if args.build:
         x = build(current_bin, args.build == 'release', features)
         if args.perms:
             su_copy(x, f'{DIR}/{BIN}')
             setup_permissions(f'{DIR}/{BIN}')
-
     if args.install:
         install(current_bin, features)
 
@@ -278,9 +250,7 @@ def main():
 if __name__ == '__main__':
     # We'll operate in the project root for simplicity
     os.chdir(DIR)
-
     # Run the cli
     main()
-
     # Go back to the original working directory
     os.chdir(OLD)

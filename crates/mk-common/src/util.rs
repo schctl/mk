@@ -1,16 +1,21 @@
 //! Utilities.
 
 use std::ffi::CStr;
+use std::io;
 use std::os::raw::c_char;
 
-use crate::errors::*;
+use crate::nullptr_bail;
 
 /// Convert from a `C` [`*c_char`](c_char) to a Rust [`String`] safely.
-pub fn cstr_to_string(ptr: *mut c_char) -> Result<String, FfiError> {
+pub fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
     if ptr.is_null() {
-        return Err(FfiError::InvalidPtr);
+        nullptr_bail!();
     }
-    Ok(unsafe { CStr::from_ptr(ptr) }.to_str()?.to_string())
+
+    match unsafe { CStr::from_ptr(ptr) }.to_str() {
+        Ok(s) => Ok(s.to_string()),
+        Err(_) => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid utf-8")),
+    }
 }
 
 /// Get the `$PATH` variable from the environment.
@@ -33,16 +38,5 @@ mod tests {
             &cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap()[..],
             "test\x123"
         )
-    }
-
-    #[test]
-    fn test_cstr_from_nullptr() {
-        match cstr_to_string(::std::ptr::null_mut()) {
-            Ok(_) => panic!("Null pointer conversion somehow succeeded?"),
-            Err(e) => match e {
-                FfiError::InvalidPtr => {}
-                _ => panic!("Null pointer conversion error is not invalid ptr."),
-            },
-        }
     }
 }

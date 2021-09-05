@@ -1,6 +1,8 @@
 //! User authentication agents.
 
-pub mod passwd;
+use std::io;
+
+pub mod pwd;
 
 #[cfg(feature = "pam")]
 pub mod pam;
@@ -33,8 +35,8 @@ pub trait Authenticator {
 pub enum Supported {
     /// [`pam::PamAuthenticator`] authentication.
     Pam,
-    /// [`passwd::PasswdAuthenticator`] authentication.
-    Passwd,
+    /// [`passwd::PwdAuthenticator`] authentication.
+    Pwd,
 }
 
 /// Create a new authenticator from the supported types.
@@ -45,8 +47,11 @@ pub fn new(_type: Supported) -> MkResult<Box<dyn Authenticator>> {
     Ok(match _type {
         #[cfg(feature = "pam")]
         Supported::Pam => Box::new(pam::PamAuthenticator::new()),
-        // Passwd guaranteed to be available.
-        Supported::Passwd => Box::new(passwd::PasswdAuthenticator::new()),
-        _ => return Err(MkError::Ffi(FfiError::ResourceUnavailable)),
+        Supported::Pwd => Box::new(pwd::PwdAuthenticator::new()),
+        _ => {
+            return Err(
+                io::Error::new(io::ErrorKind::NotFound, "no supported authenticator").into(),
+            )
+        }
     })
 }

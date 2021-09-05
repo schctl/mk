@@ -36,6 +36,8 @@ shadow = { version = "0.0.1", optional = true }
 mk-pam = { path = "crates/mk-pam", optional = true }
 
 [features]
+default = ["sdw", "mk-pam"]
+
 # Pam authentication.
 pam = ["mk-pam"]
 

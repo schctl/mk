@@ -1,6 +1,6 @@
 //! Error types.
 
-use mk_common::FfiError;
+use std::io;
 use thiserror::Error as ThisError;
 
 #[cfg(feature = "pam")]
@@ -14,35 +14,17 @@ pub enum MkError {
     #[cfg(feature = "pam")]
     Pam(RawError),
 
-    /// FFI error.
-    #[error("FFI error")]
-    Ffi(FfiError),
-
-    /// Error authenticating a user
-    #[error("Error authenticating a user")]
-    Auth,
+    /// IO Error.
+    #[error("IO error")]
+    Io(#[from] io::Error),
 }
 
 #[cfg(feature = "pam")]
-impl<T> From<T> for MkError
-where
-    T: Into<PamError>,
-{
-    fn from(e: T) -> Self {
-        let e: PamError = e.into();
+impl From<PamError> for MkError {
+    fn from(e: PamError) -> Self {
         match e {
-            PamError::Ffi(f) => Self::Ffi(f),
-            PamError::Raw(f) => Self::Pam(f),
+            PamError::Raw(r) => Self::Pam(r),
+            PamError::Io(r) => Self::Io(r),
         }
-    }
-}
-
-#[cfg(not(feature = "pam"))]
-impl<T> From<T> for MkError
-where
-    T: Into<FfiError>,
-{
-    fn from(e: T) -> Self {
-        Self::Ffi(e.into())
     }
 }

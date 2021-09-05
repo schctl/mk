@@ -2,13 +2,13 @@
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
+use std::io;
 use std::os::raw::{c_char, c_int, c_void};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use mk_common::errors::FfiError;
-use mk_common::util;
+use mk_common::*;
 
 use crate::errors::*;
 use crate::ffi;
@@ -49,25 +49,27 @@ pub enum Message {
 }
 
 impl TryFrom<*const ffi::pam_message> for Message {
-    type Error = PamError;
+    type Error = io::Error;
 
     /// Convert a raw *[`ffi::pam_message`] to a [`Message`]. Returns the
     /// message contents as a [`String`] if it is of an unknown type.
     fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
         if value.is_null() {
-            return Err(FfiError::InvalidPtr.into());
+            nullptr_bail!();
         }
 
         let value = unsafe { *value };
-
-        let msg = unsafe { CStr::from_ptr(value.msg) }.to_str()?.to_string();
+        let msg = util::cstr_to_string(value.msg as *mut i8)?;
 
         match value.msg_style as u32 {
             ffi::PAM_PROMPT_ECHO_OFF => Ok(Self::Prompt(msg)),
             ffi::PAM_PROMPT_ECHO_ON => Ok(Self::PromptEcho(msg)),
             ffi::PAM_ERROR_MSG => Ok(Self::ShowError(msg)),
             ffi::PAM_TEXT_INFO => Ok(Self::ShowText(msg)),
-            _ => Err(RawError::Buffer.into()),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unknown message style",
+            )),
         }
     }
 }

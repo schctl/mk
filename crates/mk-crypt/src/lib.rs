@@ -2,7 +2,8 @@
 
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
+use std::io;
 use std::os::raw::c_char;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -25,12 +26,12 @@ mod ffi {
 ///
 /// # Errors
 ///
-/// * [`FfiError::ResourceUnavailable`] - The function was called from multiple threads simultaneously.
-/// * [`FfiError::InvalidPtr`] - Failed to hash the passphrase. This can occur if the system
-///   does not support `crypt` at runtime as well.
+/// * An [`io::Error`] of kind [`io::ErrorKind::Interrupted`] - if multiple threads try to use this
+///   method at once.
+/// * An [`io::Error`] of kind [`io::ErrorKind::InvalidData`] - if the returned bytes were not valid utf-8.
 ///
 /// See <https://linux.die.net/man/3/crypt> for more.
-pub fn crypt<'a>(phrase: &'a str, setting: &'a str) -> Result<&'a str, FfiError> {
+pub fn crypt(phrase: &str, setting: &str) -> io::Result<String> {
     // Maybe check if passphrase starts with `*` and return `InvalidPtr`?
     //
     // From the linux man pages:
@@ -41,7 +42,7 @@ pub fn crypt<'a>(phrase: &'a str, setting: &'a str) -> Result<&'a str, FfiError>
     // > equal to setting.
 
     if CRYPT_LOCK.load(Ordering::SeqCst) {
-        return Err(FfiError::InvalidPtr);
+        return Err(io::Error::new(io::ErrorKind::Interrupted, "thread locked"));
     }
 
     CRYPT_LOCK.store(true, Ordering::SeqCst);
@@ -58,11 +59,7 @@ pub fn crypt<'a>(phrase: &'a str, setting: &'a str) -> Result<&'a str, FfiError>
 
     CRYPT_LOCK.store(false, Ordering::SeqCst);
 
-    if encrypted.is_null() {
-        return Err(FfiError::InvalidPtr);
-    }
-
-    Ok(unsafe { CStr::from_ptr(encrypted).to_str()? })
+    util::cstr_to_string(encrypted)
 }
 
 #[cfg(test)]
@@ -70,7 +67,6 @@ mod tests {
     use super::*;
 
     const TEST_STR: &str = "Hello";
-    const TEST_SET: &str = "$6$0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     const TEST_RES: &str = "$6$0000000000000000$rYZz1UNjyOm674sxVJ.lQ0fLFXMCBRjt.yZXhYx5S2PNgGBXrK9wXLY1ZZ0PhfM8be3g/lCW7TvKtzapAO4Lt/";
 
     #[test]
@@ -78,7 +74,6 @@ mod tests {
         // Don't want these to run in parallel
 
         // First check to see if the hash works
-        assert_eq!(crypt(TEST_STR, TEST_SET).unwrap(), TEST_RES);
         assert_eq!(crypt(TEST_STR, TEST_RES).unwrap(), TEST_RES);
 
         // Test from multiple threads
@@ -86,7 +81,7 @@ mod tests {
     }
 
     /// When calling `crypt` from multiple threads at the same time, the output must always be either
-    /// an [`Ffi::InvalidPtr`] - indicating that another thread has called `crypt` first, or the
+    /// an [`Ffi::ResourceUnavailable`] - indicating that another thread has called `crypt` first, or the
     /// correct hash, but never an invalid hash.
     fn test_concurrent_crypt() {
         const RUNS: usize = 1_000;
@@ -94,10 +89,14 @@ mod tests {
 
         fn run() {
             for _ in 0..RUNS {
-                match crypt(TEST_STR, TEST_SET) {
-                    Ok(TEST_RES) => {}
-                    Err(FfiError::InvalidPtr) => {}
-                    _ => panic!("Invalid result for crypt."),
+                match crypt(TEST_STR, TEST_RES) {
+                    Ok(s) => {
+                        assert_eq!(s, TEST_RES)
+                    }
+                    Err(e) => match e.kind() {
+                        io::ErrorKind::Interrupted => {}
+                        _ => panic!("Invalid result for crypt."),
+                    },
                 }
             }
         }
