@@ -1,4 +1,4 @@
-//! Bindings for Unix's `libcrypt`.
+//! Interface to Unix's `crypt` function.
 
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
@@ -12,7 +12,8 @@ use mk_common::*;
 static CRYPT_LOCK: AtomicBool = AtomicBool::new(false);
 
 /// Raw bindings to crypt headers.
-pub mod ffi {
+mod ffi {
+    #![allow(unused)]
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
     #![allow(non_upper_case_globals)]

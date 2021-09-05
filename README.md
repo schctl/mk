@@ -8,7 +8,8 @@
 ### Requirements
 
  - Rust's nightly toolchain (1.56 or higher)
- - Python
+ - A `C` compiler
+ - Python 3.6+ for `x.py`
 
 ### `x.py`
 
@@ -16,13 +17,13 @@
 
 ### Examples
 
-**Clean build artifacts and reubild `mk`**
+**Clean artifacts and rebuild `mk`**
 
 ```sh
-$ ./x.py --clean --build
+$ ./x.py --clean --build release
 ```
 
-**install `mk`**
+**Install `mk`**
 
 ```sh
 $ ./x.py --install

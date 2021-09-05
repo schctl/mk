@@ -16,3 +16,7 @@ mk-common = { path = "../mk-common" }
 
 [build-dependencies]
 bindgen = "0.59"
+
+[features]
+linux-pam = []
+open-pam = []

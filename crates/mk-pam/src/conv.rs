@@ -67,7 +67,7 @@ impl TryFrom<*const ffi::pam_message> for Message {
             ffi::PAM_PROMPT_ECHO_ON => Ok(Self::PromptEcho(msg)),
             ffi::PAM_ERROR_MSG => Ok(Self::ShowError(msg)),
             ffi::PAM_TEXT_INFO => Ok(Self::ShowText(msg)),
-            _ => Err(RawError::BadItem.into()),
+            _ => Err(RawError::Buffer.into()),
         }
     }
 }
@@ -139,24 +139,22 @@ pub(crate) extern "C" fn __raw_pam_conv(
                 ffi::PAM_PROMPT_ECHO_ON => Message::PromptEcho(contents),
                 ffi::PAM_TEXT_INFO => Message::ShowText(contents),
                 ffi::PAM_ERROR_MSG => Message::ShowError(contents),
-                // Error code - SAME HERE
-                _ => return RawError::BadItem.into(),
+                // Error code - same here
+                _ => return RawError::Buffer.into(),
             };
 
             // Get response and write it
             if let Some(resp) = (f.conv)(&msg) {
                 responses.push(match ffi::pam_response::try_from(resp) {
                     Ok(r) => r,
-                    // Error code - SAME HERE
-                    Err(_) => return RawError::BadItem.into(),
+                    // Error code - same here
+                    Err(_) => return RawError::Buffer.into(),
                 })
             }
         }
 
         unsafe { *raw_responses = responses.into_raw_parts().0 };
-
-        return ffi::PAM_SUCCESS as c_int;
     };
 
-    RawError::BadItem.into()
+    ffi::PAM_SUCCESS as c_int
 }

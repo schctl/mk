@@ -31,9 +31,9 @@ clap = "3.0.0-beta.4"
 mk-common = { path = "crates/mk-common" }
 
 mk-pwd = { path = "crates/mk-pwd" }
+mk-crypt = { path = "crates/mk-crypt" }
 shadow = { version = "0.0.1", optional = true }
 mk-pam = { path = "crates/mk-pam", optional = true }
-mk-crypt = { path = "crates/mk-crypt" }
 
 [features]
 # Pam authentication.
