@@ -55,21 +55,18 @@ impl TryFrom<*const ffi::pam_message> for Message {
     /// message contents as a [`String`] if it is of an unknown type.
     fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
         if value.is_null() {
-            nullptr_bail!();
+            io_bail!(InvalidData, "null pointer");
         }
 
         let value = unsafe { *value };
-        let msg = util::cstr_to_string(value.msg as *mut i8)?;
+        let msg = cstr_to_string(value.msg as *mut i8)?;
 
         match value.msg_style as u32 {
             ffi::PAM_PROMPT_ECHO_OFF => Ok(Self::Prompt(msg)),
             ffi::PAM_PROMPT_ECHO_ON => Ok(Self::PromptEcho(msg)),
             ffi::PAM_ERROR_MSG => Ok(Self::ShowError(msg)),
             ffi::PAM_TEXT_INFO => Ok(Self::ShowText(msg)),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "unknown message style",
-            )),
+            _ => io_err!(InvalidData, "unknown message style"),
         }
     }
 }
@@ -129,7 +126,7 @@ pub(crate) extern "C" fn __raw_pam_conv(
             let raw_msg = unsafe { *raw_msgs.offset(i) };
 
             // Create message
-            let contents = match unsafe { util::cstr_to_string((*raw_msg).msg as *mut c_char) } {
+            let contents = match unsafe { cstr_to_string((*raw_msg).msg as *mut c_char) } {
                 Ok(s) => s,
                 // I DON'T KNOW IF THESE RETURN CODES ARE CORRECT
                 // (but it should be fine for now)

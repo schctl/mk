@@ -2,17 +2,15 @@
 #![feature(never_type)]
 
 #[macro_use]
-mod prompt;
+pub mod util;
+pub mod errors;
 
 mod app;
-#[allow(unused)]
 mod auth;
 mod cli;
 mod config;
-pub mod errors;
 mod options;
 mod prelude;
-pub mod util;
 
 pub use errors::*;
 

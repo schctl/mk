@@ -9,24 +9,22 @@
 
  - Rust's nightly toolchain (1.56 or higher)
  - A `C` compiler
- - Python 3.6+ for `x.py`
 
-### `x.py`
+### Features
 
-`x.py` is a helper script to help build, test and install `mk`. Use `./x.py -h` to see all options.
+ - `pam`
+    - Requires a PAM implementation to be installed.
+ - `sdw`
+    - Requires your system to provide `shadow.h`.
 
-### Examples
+`s.py` attempts to output a list of supported features on your system.
 
-**Clean artifacts and rebuild `mk`**
+### Build
 
-```sh
-$ ./x.py --clean --build release
-```
-
-**Install `mk`**
+**Building with cargo and supported features**
 
 ```sh
-$ ./x.py --install
+cargo build --features $(./s.py)
 ```
 
 ---

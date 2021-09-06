@@ -14,5 +14,3 @@ mk
 .idea
 
 crates/*/Cargo.lock
-
-_tmp_build

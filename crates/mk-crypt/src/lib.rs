@@ -42,7 +42,7 @@ pub fn crypt(phrase: &str, setting: &str) -> io::Result<String> {
     // > equal to setting.
 
     if CRYPT_LOCK.load(Ordering::SeqCst) {
-        return Err(io::Error::new(io::ErrorKind::Interrupted, "thread locked"));
+        io_bail!(Interrupted, "thread locked");
     }
 
     CRYPT_LOCK.store(true, Ordering::SeqCst);
@@ -59,7 +59,7 @@ pub fn crypt(phrase: &str, setting: &str) -> io::Result<String> {
 
     CRYPT_LOCK.store(false, Ordering::SeqCst);
 
-    util::cstr_to_string(encrypted)
+    cstr_to_string(encrypted)
 }
 
 #[cfg(test)]

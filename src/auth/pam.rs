@@ -3,8 +3,6 @@
 //! [`PAM`]: https://en.wikipedia.org/wiki/Pluggable_authentication_module
 
 use std::collections::HashMap;
-use std::ffi::CString;
-use std::os::raw::{c_int, c_void};
 use std::time::{Duration, Instant};
 
 use mk_pam as pam;
@@ -12,7 +10,6 @@ use mk_pwd::Uid;
 
 use super::Authenticator;
 use crate::prelude::*;
-use crate::prompt;
 
 /// PAM authentication structure. Holds all data required to begin a session with PAM.
 pub struct PamAuthenticator {
@@ -70,17 +67,17 @@ impl Authenticator for PamAuthenticator {
             }),
         };
 
-        let handle = pam::Handle::start("mk", &user.name[..], conv)?;
+        let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], conv)?;
 
         // Set requesting user.
         if let Err(e) = handle.set_item(pam::Item::RequestUser(user.name.clone())) {
-            handle.end();
+            handle.end()?;
             return Err(e.into());
         }
 
         // Authenticate user.
         if let Err(e) = handle.authenticate(None) {
-            handle.end();
+            handle.end()?;
             return Err(e.into());
         }
 
@@ -88,7 +85,7 @@ impl Authenticator for PamAuthenticator {
         if let Err(pam::PamError::Raw(pam::RawError::NewAuthTokenRequired)) = handle.validate(None)
         {
             if let Err(e) = handle.change_auth_token(None) {
-                handle.end();
+                handle.end()?;
                 return Err(e.into());
             }
         }

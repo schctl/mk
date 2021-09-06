@@ -146,7 +146,7 @@ impl Handle {
                 as i32;
 
         if pamh.is_null() {
-            nullptr_bail!();
+            io_bail!(InvalidData, "null pointer");
         };
 
         match RawError::try_from(ret as i32) {

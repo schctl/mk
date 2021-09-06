@@ -1,9 +1,8 @@
-//! User authentication using the system `<pwd.h>`.
+//! User authentication using the system password database.
 //!
 //! This is the fallback authenticator type, and is available on all platforms.
 
 use std::collections::HashMap;
-use std::io;
 use std::time::{Duration, Instant};
 
 use mk_common::*;
@@ -12,7 +11,7 @@ use mk_pwd::Uid;
 use super::Authenticator;
 use crate::prelude::*;
 
-/// Holds all the information required for authentication using the system `<pwd.h>`.
+/// Holds all the information required for authentication using the system password database.
 pub struct PwdAuthenticator {
     /// List of all authenticated users and when they were authenticated.
     users: HashMap<Uid, Instant>,
@@ -39,7 +38,7 @@ impl Authenticator for PwdAuthenticator {
         }
 
         // Authenticate if user doesn't have a password.
-        let mut password = match user.password.clone() {
+        let password = match user.password.clone() {
             Some(p) => p,
             None => return Ok(()),
         };
@@ -47,27 +46,27 @@ impl Authenticator for PwdAuthenticator {
         #[cfg(feature = "sdw")]
         let password = match &password[..] {
             // Not sure how to handle this
-            "*" => auth_bail!("disallowed login"),
+            "*" => io_bail!(PermissionDenied, "disallowed login"),
             // > On most modern systems, this field is set to x, and the user password is stored in
             // > the /etc/shadow file.
             "x" => match shadow::Shadow::from_name(&user.name[..]) {
                 Some(s) => match &s.password[..] {
-                    "*" | "!" => auth_bail!("disallowed login"),
+                    "*" | "!" => io_bail!(PermissionDenied, "disallowed login"),
                     _ => s.password,
                 },
-                None => auth_bail!("disallowed login"),
+                None => io_bail!(PermissionDenied, "disallowed login"),
             },
             _ => password,
         };
 
         #[cfg(not(feature = "sdw"))]
         let password = match &password[..] {
-            "*" | "x" => auth_bail!("disallowed login"),
+            "*" | "x" => io_bail!(PermissionDenied, "disallowed login"),
             _ => password,
         };
 
         if password != mk_crypt::crypt(&prompt!(true, "[{}] Password: ", user.name)?, &password)? {
-            auth_bail!("Authentication failed");
+            io_bail!(PermissionDenied, "Authentication failed");
         }
 
         self.users.insert(user.uid, Instant::now());

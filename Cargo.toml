@@ -10,6 +10,7 @@ members = [
 
 [package]
 name = "mk"
+rust-version = "1.56"
 
 license = "MIT"
 version = "0.0.1"
@@ -36,14 +37,12 @@ shadow = { version = "0.0.1", optional = true }
 mk-pam = { path = "crates/mk-pam", optional = true }
 
 [features]
-default = ["sdw", "mk-pam"]
-
-# Pam authentication.
+# PAM authentication.
 pam = ["mk-pam"]
 
 # Shadow file authentication.
 #
-# The default authenticator is [`auth::passwd`], which is available on all platforms (POSIX defines `pwd.h`).
+# The default authenticator is [`auth::pwd`], which is available on all platforms (POSIX defines `pwd.h`).
 # In some cases, the user's password is defined in `/etc/shadow` instead, which we access through `shadow.h`,
 # and may not be available on all systems, so we need to define a feature for it.
 sdw = ["shadow"]
