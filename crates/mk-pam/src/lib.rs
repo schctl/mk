@@ -1,6 +1,14 @@
 //! Rust interface to PAM (Pluggable Authentication Modules).
 //!
 //! This crate provides **experimental** safe interfaces to PAM as well.
+//!
+//! ## Potentially useful links
+//!
+//! - [`OpenPAM`](https://www.openpam.org/wiki>)
+//! - [`Linux-PAM`](http://www.linux-pam.org/)
+//! - [The Linux-PAM Application Developers' Guide](http://uw714doc.sco.com/en/SEC_pam/pam_appl.html)
+//! - [IBM docs](https://www.ibm.com/docs/en/aix/7.2?topic=system-pluggable-authentication-modules)
+//! - [Wikipedia](https://en.wikipedia.org/wiki/Pluggable_authentication_module)
 
 #![feature(vec_into_raw_parts)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -19,9 +27,12 @@ pub use errors::*;
 
 /// Raw bindings to PAM headers.
 pub mod ffi {
+    #![allow(unused)]
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
     #![allow(non_upper_case_globals)]
+    #![allow(clippy::upper_case_acronyms)]
+    #![allow(clippy::redundant_static_lifetimes)]
 
     include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
 }

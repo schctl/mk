@@ -1,5 +1,4 @@
 fn main() {
-    println!("cargo:rustc-link-lib=crypt");
     println!("cargo:rerun-if-changed=build/wrapper.h");
 
     let bindings = bindgen::Builder::default()

@@ -22,12 +22,11 @@ pub trait Authenticator {
 }
 
 /// All supported authenticator types.
-///
-/// Not checked for whether they are enabled through a feature.
 #[allow(unused)]
 #[non_exhaustive]
 pub enum Supported {
     /// [`pam::PamAuthenticator`] authentication.
+    #[cfg(feature = "pam")]
     Pam,
     /// [`pwd::PwdAuthenticator`] authentication.
     Pwd,
@@ -35,7 +34,7 @@ pub enum Supported {
 
 /// Create a new authenticator from the supported types.
 ///
-/// This returns an [`io::Error`] of kind [`io::ErrorKind::NotFound`] if the feature for the given type of authenticator
+/// This returns an [`std::io::Error`] of kind [`std::io::ErrorKind::NotFound`] if the feature for the given type of authenticator
 /// has not been specified.
 #[allow(unreachable_patterns)]
 pub fn new(_type: Supported) -> MkResult<Box<dyn Authenticator>> {

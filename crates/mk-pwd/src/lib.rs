@@ -1,4 +1,6 @@
-//! Rust interface to Unix's `pwd.h`.
+//! Rust interface to POSIX's `pwd.h`.
+//!
+//! See also [`pwd.h(0p)`](https://man7.org/linux/man-pages/man0/pwd.h.0p.html).
 
 use std::ffi::CString;
 use std::io;
@@ -70,33 +72,17 @@ impl Passwd {
     ///
     /// # Errors
     ///
-    /// - [`io::Error`] if a user was not found or if an error occurred.
+    /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_uid(uid: Uid) -> io::Result<Self> {
-        unsafe {
-            let pwd = libc::getpwuid(uid);
-
-            if pwd.is_null() {
-                return Err(io::Error::last_os_error());
-            }
-
-            Self::from_raw(pwd)
-        }
+        unsafe { Self::from_raw(libc::getpwuid(uid)) }
     }
 
     /// Get a [`Passwd`] entry from a user name.
     ///
     /// # Errors
     ///
-    /// - [`io::Error`] if a user was not found or if an error occurred.
+    /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_name(name: &str) -> io::Result<Self> {
-        unsafe {
-            let pwd = libc::getpwnam(CString::new(name)?.as_ptr());
-
-            if pwd.is_null() {
-                return Err(io::Error::last_os_error());
-            }
-
-            Self::from_raw(pwd)
-        }
+        unsafe { Self::from_raw(libc::getpwnam(CString::new(name)?.as_ptr())) }
     }
 }

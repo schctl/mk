@@ -20,7 +20,7 @@ FEATURES = {
         'dylibs': ['crypt']
     },
     # ------------------------------
-    'sdw': {
+    'shadow': {
         'headers': ['shadow'],
         'dylibs': []
     },

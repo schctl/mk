@@ -5,23 +5,16 @@
 
 ---
 
-### Requirements
+### Feature flags
 
- - Rust's nightly toolchain (1.56 or higher)
- - A `C` compiler
-
-### Features
-
- - `pam`
-    - Requires a PAM implementation to be installed.
- - `sdw`
-    - Requires your system to provide `shadow.h`.
+| Flag | Description | Requires | Rust |
+|------|-------------|----------|------|
+| `pam` | Builds with authenticator support for [`PAM`](https://en.wikipedia.org/wiki/Pluggable_authentication_module) | A `PAM` implementation ([`Linux-PAM`](http://www.linux-pam.org/), [`OpenPAM`](https://www.openpam.org/)) | 1.56.0-nightly+  |
+| `shadow` | Builds with authenticator support for [`shadow-utils`](https://github.com/shadow-maint/shadow) | System provided `shadow.h` | 1.45+ |
 
 `s.py` attempts to output a list of supported features on your system.
 
-### Build
-
-**Building with cargo and supported features**
+#### Building with supported features
 
 ```sh
 cargo build --features $(./s.py)

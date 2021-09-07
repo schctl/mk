@@ -41,29 +41,31 @@ impl PwdAuthenticator {
             None => return Ok(()),
         };
 
-        #[cfg(feature = "sdw")]
+        #[cfg(feature = "shadow")]
         let password = match &password[..] {
             // Not sure how to handle this
             "*" => io_bail!(PermissionDenied, "disallowed login"),
             // > On most modern systems, this field is set to x, and the user password is stored in
             // > the /etc/shadow file.
-            "x" => match shadow::Shadow::from_name(&user.name[..]) {
-                Some(s) => match &s.password[..] {
-                    "*" | "!" => io_bail!(PermissionDenied, "disallowed login"),
-                    _ => s.password,
-                },
-                None => io_bail!(PermissionDenied, "disallowed login"),
-            },
+            "x" => {
+                let spwd = mk_shadow::Spwd::from_name(&user.name[..])?;
+
+                if let "*" | "!" = &spwd.password[..] {
+                    io_bail!(PermissionDenied, "disallowed login")
+                }
+
+                spwd.password
+            }
             _ => password,
         };
 
-        #[cfg(not(feature = "sdw"))]
+        #[cfg(not(feature = "shadow"))]
         let password = match &password[..] {
             "*" | "x" => io_bail!(PermissionDenied, "disallowed login"),
             _ => password,
         };
 
-        if password != mk_crypt::crypt(&prompt!(true, "[{}] Password: ", user.name)?, &password)? {
+        if !pwhash::unix::verify(&prompt!(true, "[{}] Password: ", user.name)?, &password[..]) {
             io_bail!(PermissionDenied, "Authentication failed");
         }
 

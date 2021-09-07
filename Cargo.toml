@@ -1,16 +1,13 @@
-cargo-features = ["strip"]
-
 [workspace]
 members = [
     "crates/mk-common",
-    "crates/mk-crypt",
     "crates/mk-pam",
-    "crates/mk-pwd"
+    "crates/mk-pwd",
+    "crates/mk-shadow"
 ]
 
 [package]
 name = "mk"
-rust-version = "1.56"
 
 license = "MIT"
 version = "0.0.1"
@@ -19,12 +16,12 @@ authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 
 [profile.release]
 lto = true
-strip = true
 codegen-units = 1
 
 [dependencies]
 libc = "0.2"
 
+pwhash = "1.0"
 rpassword = "5.0"
 thiserror = "1.0"
 clap = "3.0.0-beta.4"
@@ -32,17 +29,13 @@ clap = "3.0.0-beta.4"
 mk-common = { path = "crates/mk-common" }
 
 mk-pwd = { path = "crates/mk-pwd" }
-mk-crypt = { path = "crates/mk-crypt" }
-shadow = { version = "0.0.1", optional = true }
 mk-pam = { path = "crates/mk-pam", optional = true }
+mk-shadow = { path = "crates/mk-shadow", optional = true }
 
 [features]
 # PAM authentication.
 pam = ["mk-pam"]
 
 # Shadow file authentication.
-#
-# The default authenticator is [`auth::pwd`], which is available on all platforms (POSIX defines `pwd.h`).
-# In some cases, the user's password is defined in `/etc/shadow` instead, which we access through `shadow.h`,
-# and may not be available on all systems, so we need to define a feature for it.
-sdw = ["shadow"]
+# Only available if `shadow-utils` is available.
+shadow = ["mk-shadow"]
