@@ -34,6 +34,10 @@ pub struct Passwd {
 impl Passwd {
     /// Get a `passwd` entry from a raw [`libc::passwd`] pointer.
     ///
+    /// # Errors
+    ///
+    /// - [`io::Error`] of kind [`io::ErrorKind::InvalidData`] - when the pointer is null.
+    ///
     /// # Safety
     ///
     /// `ptr` must be a valid pointer to a [`libc::passwd`].
@@ -63,12 +67,36 @@ impl Passwd {
     }
 
     /// Get a [`Passwd`] entry from a [`Uid`].
+    ///
+    /// # Errors
+    ///
+    /// - [`io::Error`] if a user was not found or if an error occurred.
     pub fn from_uid(uid: Uid) -> io::Result<Self> {
-        unsafe { Self::from_raw(libc::getpwuid(uid)) }
+        unsafe {
+            let pwd = libc::getpwuid(uid);
+
+            if pwd.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+
+            Self::from_raw(pwd)
+        }
     }
 
     /// Get a [`Passwd`] entry from a user name.
+    ///
+    /// # Errors
+    ///
+    /// - [`io::Error`] if a user was not found or if an error occurred.
     pub fn from_name(name: &str) -> io::Result<Self> {
-        unsafe { Self::from_raw(libc::getpwnam(CString::new(name)?.as_ptr())) }
+        unsafe {
+            let pwd = libc::getpwnam(CString::new(name)?.as_ptr());
+
+            if pwd.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+
+            Self::from_raw(pwd)
+        }
     }
 }

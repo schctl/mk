@@ -24,15 +24,12 @@ impl PamAuthenticator {
             users: HashMap::new(),
         }
     }
-}
 
-impl Authenticator for PamAuthenticator {
-    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
+    /// Start a PAM context and return its corresponding handle.
+    fn create_context(&mut self, user: &mk_pwd::Passwd) -> MkResult<pam::Handle> {
         // Check if user is in the list of authenticated users.
         if let Some(u) = self.users.get(&user.uid) {
-            if Instant::now() - *u < Duration::from_secs(600) {
-                return Ok(());
-            } else {
+            if Instant::now() - *u > Duration::from_secs(600) {
                 self.users.remove(&user.uid);
             }
         }
@@ -90,6 +87,20 @@ impl Authenticator for PamAuthenticator {
             }
         }
 
+        Ok(handle)
+    }
+}
+
+impl Authenticator for PamAuthenticator {
+    fn session<'a>(
+        &mut self,
+        user: &mk_pwd::Passwd,
+        session: Box<dyn FnOnce() -> MkResult<()> + 'a>,
+    ) -> MkResult<()> {
+        let handle = self.create_context(user)?;
+        handle.open_session(None)?;
+        session()?;
+        handle.close_session(None)?;
         handle.end()?;
         Ok(())
     }

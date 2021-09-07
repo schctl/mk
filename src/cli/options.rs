@@ -57,6 +57,6 @@ pub fn options_from_terminal() -> MkResult<MkOptions> {
                 _ => None,
             },
         }),
-        _ => MkOptions::Help(usage),
+        _ => MkOptions::Text(usage),
     })
 }

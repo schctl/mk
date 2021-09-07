@@ -10,12 +10,12 @@ use mk_pam::{PamError, RawError};
 #[derive(ThisError, Debug)]
 pub enum MkError {
     /// PAM error.
-    #[error("PAM error")]
+    #[error("{0}")]
     #[cfg(feature = "pam")]
     Pam(RawError),
 
     /// IO Error.
-    #[error("IO error")]
+    #[error("{0}")]
     Io(#[from] io::Error),
 }
 

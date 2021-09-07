@@ -340,4 +340,62 @@ impl Handle {
             Err(_) => Ok(()),
         }
     }
+
+    /// Start a user session.
+    ///
+    /// This function is used to set up a user session for a previously authenticated user, and informs
+    /// modules that a session has begun. The session should be terminated with a call to
+    /// [`Handle::close_session`](crate::Handle::close_session). An [`Err`] is returned if a session
+    /// could not be opened.
+    ///
+    /// *This function is a safe interface to [`ffi::pam_open_session`]. To see more, here are a few links:*
+    /// - <https://linux.die.net/man/3/pam_open_session>
+    /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-open-session-3pam.html>
+    pub fn open_session(&self, flags: Option<i32>) -> PamResult<()> {
+        let ret = unsafe {
+            ffi::pam_open_session(
+                self.interior,
+                match flags {
+                    Some(f) => f,
+                    None => ffi::PAM_SUCCESS as i32,
+                } as c_int,
+            )
+        } as i32;
+
+        self.last_retcode
+            .store(ret, std::sync::atomic::Ordering::SeqCst);
+
+        match RawError::try_from(ret) {
+            Ok(e) => Err(e.into()),
+            Err(_) => Ok(()),
+        }
+    }
+
+    /// Terminate a user session.
+    ///
+    /// This function is used to indicate that an authenticated session has ended. See
+    /// [`Handle::open_session`](crate::Handle::open_session) for more.
+    ///
+    /// *This function is a safe interface to [`ffi::pam_close_session`]. To see more, here are a few links:*
+    /// - <https://linux.die.net/man/3/pam_close_session>
+    /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-close-session-3pam.html>
+    pub fn close_session(&self, flags: Option<i32>) -> PamResult<()> {
+        let ret = unsafe {
+            ffi::pam_close_session(
+                self.interior,
+                match flags {
+                    Some(f) => f,
+                    None => ffi::PAM_SUCCESS as i32,
+                } as c_int,
+            )
+        } as i32;
+
+        self.last_retcode
+            .store(ret, std::sync::atomic::Ordering::SeqCst);
+
+        match RawError::try_from(ret) {
+            Ok(e) => Err(e.into()),
+            Err(_) => Ok(()),
+        }
+    }
 }

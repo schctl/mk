@@ -31,6 +31,11 @@ macro_rules! io_bail {
 }
 
 /// Convert from a `C` [`*c_char`](c_char) to a Rust [`String`] safely.
+///
+/// # Errors
+///
+/// - [`io::Error`] of kind [`io::ErrorKind::InvalidData`] - when the pointer is null, or does not
+///   point to valid utf-8 data.
 pub fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
     if ptr.is_null() {
         io_bail!(InvalidData, "null pointer");
@@ -45,12 +50,12 @@ pub fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
 /// Get the `$PATH` variable from the environment.
 ///
 /// Returns a fallback string if `$PATH` is not available.
+#[must_use]
 pub fn get_path() -> String {
-    if let Some(p) = std::env::vars().find(|p| p.0 == "PATH") {
-        p.1
-    } else {
-        String::from("/usr/local/sbin:/usr/local/bin:/usr/bin")
-    }
+    std::env::vars().find(|p| p.0 == "PATH").map_or(
+        String::from("/usr/local/sbin:/usr/local/bin:/usr/bin"),
+        |p| p.1,
+    )
 }
 
 #[cfg(test)]

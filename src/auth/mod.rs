@@ -13,12 +13,12 @@ use crate::prelude::*;
 /// Additional required information must be held by the implementer. The intention is for an
 /// Authenticator to be dumped to a file and recovered between sessions.
 pub trait Authenticator {
-    /// Authenticate validity of a user.
-    ///
-    /// # Returns
-    ///
-    /// `()` if the user has been authenticated.
-    fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()>;
+    /// Run a function in an authenticated session.
+    fn session<'a>(
+        &mut self,
+        user: &mk_pwd::Passwd,
+        session: Box<dyn FnOnce() -> MkResult<()> + 'a>,
+    ) -> MkResult<()>;
 }
 
 /// All supported authenticator types.

@@ -24,5 +24,5 @@ impl CommandOptions {
 #[derive(Debug, Clone)]
 pub enum MkOptions {
     Command(CommandOptions),
-    Help(String),
+    Text(String),
 }

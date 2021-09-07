@@ -24,9 +24,7 @@ impl PwdAuthenticator {
             users: HashMap::new(),
         }
     }
-}
 
-impl Authenticator for PwdAuthenticator {
     fn authenticate(&mut self, user: &mk_pwd::Passwd) -> MkResult<()> {
         // Check if user is in the list of authenticated users.
         if let Some(u) = self.users.get(&user.uid) {
@@ -71,5 +69,16 @@ impl Authenticator for PwdAuthenticator {
 
         self.users.insert(user.uid, Instant::now());
         Ok(())
+    }
+}
+
+impl Authenticator for PwdAuthenticator {
+    fn session<'a>(
+        &mut self,
+        user: &mk_pwd::Passwd,
+        session: Box<dyn FnOnce() -> MkResult<()> + 'a>,
+    ) -> MkResult<()> {
+        self.authenticate(user)?;
+        session()
     }
 }
