@@ -419,7 +419,6 @@ dependencies = [
 name = "mk-shadow"
 version = "0.0.1"
 dependencies = [
- "bindgen",
  "libc",
  "mk-common",
  "mk-pwd",

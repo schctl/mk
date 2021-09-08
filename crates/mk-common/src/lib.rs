@@ -5,8 +5,37 @@
 use std::ffi::CStr;
 use std::io;
 use std::os::raw::c_char;
+use std::sync::atomic::AtomicBool;
 
-/// Helper macro to get an [`Err`] variant from an [`std::io::Error`].
+/// A global lock to check whether a non-safe ffi function is in use.
+pub type GlobalFunctionLock = AtomicBool;
+
+/// Helper macro to wrap an expression within a global function lock.
+///
+/// This is a commonly used pattern throughout the `mk` crates to wrap non-thread safe functions
+/// and prevent thread races. If the given [`GlobalFunctionLock`] `$lock` is set to true, this
+/// returns an [`Err`] containing `$if_lock`. Otherwise, it sets the lock to true, evaluates the
+/// expression, resets the lock, and returns an [`Ok`] variant containing the evaluated expression.
+#[macro_export]
+macro_rules! function_lock {
+    ($lock:expr, $val:expr, $if_lock:expr) => {{
+        use std::sync::atomic::Ordering as __fn_lock_ordering;
+
+        if $lock.load(__fn_lock_ordering::SeqCst) {
+            Err($if_lock)
+        } else {
+            $lock.store(true, __fn_lock_ordering::SeqCst);
+            let val = $val;
+            $lock.store(false, __fn_lock_ordering::SeqCst);
+            Ok(val)
+        }
+    }};
+}
+
+/// Wraps an [`io::Error`] in an [`Err`] variant. Intended to be a little neater to read.
+///
+/// - `$kind` corresponds to the [`io::ErrorKind`] of the error to create.
+/// - `$val` corresponds to the payload contained within the error.
 #[macro_export]
 macro_rules! io_err {
     ($kind:ident, $val:expr) => {
@@ -22,26 +51,23 @@ macro_rules! io_err {
 #[macro_export]
 macro_rules! io_bail {
     ($kind:ident, $val:expr) => {
-        return io_err!($kind, $val)
+        return $crate::io_err!($kind, $val)
     };
 
     ($kind:ident) => {
-        return io_err!($kind)
+        return $crate::io_err!($kind)
     };
 }
 
-/// Convert from a `C` [`*c_char`](c_char) to a Rust [`String`] safely.
-///
-/// # Errors
-///
-/// - [`io::Error`] of kind [`io::ErrorKind::InvalidData`] - when the pointer is null, or does not
-///   point to valid utf-8 data.
-pub fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
+/// Run a generic expressionm
+
+/// Wrapper around [`CStr`] to [`String`] conversion, converting errors to [`std::io::Error`].
+pub unsafe fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
     if ptr.is_null() {
         io_bail!(InvalidData, "null pointer");
     }
 
-    match unsafe { CStr::from_ptr(ptr) }.to_str() {
+    match CStr::from_ptr(ptr).to_str() {
         Ok(s) => Ok(s.to_string()),
         Err(_) => io_err!(InvalidData, "invalid utf-8"),
     }
@@ -66,7 +92,7 @@ mod tests {
     fn test_cstr_to_string() {
         let cstr = ::std::ffi::CString::new("test\x123").unwrap();
         assert_eq!(
-            &cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap()[..],
+            &unsafe { cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap() }[..],
             "test\x123"
         )
     }

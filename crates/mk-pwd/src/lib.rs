@@ -10,6 +10,10 @@ use mk_common::*;
 pub type Uid = libc::uid_t;
 pub type Gid = libc::gid_t;
 
+/// `getpwnam` is not thread safe. This is a safe guard against thread races.
+/// See <https://man7.org/linux/man-pages/man3/getpwnam.3p.html#DESCRIPTION>.
+static PWNAME_LOCK: GlobalFunctionLock = GlobalFunctionLock::new(false);
+
 /// A single entry in the password database.
 ///
 /// See <https://linux.die.net/man/5/passwd> for more.
@@ -44,10 +48,6 @@ impl Passwd {
     ///
     /// `ptr` must be a valid pointer to a [`libc::passwd`].
     pub unsafe fn from_raw(ptr: *mut libc::passwd) -> io::Result<Self> {
-        if ptr.is_null() {
-            io_bail!(InvalidData, "null pointer");
-        }
-
         let raw = *ptr;
 
         Ok(Self {
@@ -74,7 +74,22 @@ impl Passwd {
     ///
     /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_uid(uid: Uid) -> io::Result<Self> {
-        unsafe { Self::from_raw(libc::getpwuid(uid)) }
+        // SAFETY: `getpwnam` and `getpwuid` return a null pointer if an entry is not available, or if some
+        // other error occurs during processing. We handle this with an early exit. Thread races
+        // are checked using the global `PWNAME_LOCK`.
+        unsafe {
+            let ptr = function_lock!(
+                PWNAME_LOCK,
+                libc::getpwuid(uid),
+                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            )?;
+
+            if ptr.is_null() {
+                io_bail!(InvalidData, "null pointer");
+            }
+
+            Self::from_raw(ptr)
+        }
     }
 
     /// Get a [`Passwd`] entry from a user name.
@@ -83,6 +98,21 @@ impl Passwd {
     ///
     /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_name(name: &str) -> io::Result<Self> {
-        unsafe { Self::from_raw(libc::getpwnam(CString::new(name)?.as_ptr())) }
+        // SAFETY: `getpwnam` and `getpwuid` return a null pointer if an entry is not available, or if some
+        // other error occurs during processing. We handle this with an early exit. Thread races
+        // are checked using the global `PWNAME_LOCK`.
+        unsafe {
+            let ptr = function_lock!(
+                PWNAME_LOCK,
+                libc::getpwnam(CString::new(name)?.as_ptr()),
+                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            )?;
+
+            if ptr.is_null() {
+                io_bail!(InvalidData, "null pointer");
+            }
+
+            Self::from_raw(ptr)
+        }
     }
 }

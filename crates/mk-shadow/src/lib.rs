@@ -1,8 +1,9 @@
-//! Rust interface to `shadow.h` provided by [`shadow-utils`].
+//! Rust interface to the system provided `shadow.h`.
 //!
-//! See also [`shadow(3)`](https://www.man7.org/linux/man-pages/man3/shadow.3.html).
+//! ## Potentially useful links
 //!
-//! [`shadow-utils`]: <https://github.com/shadow-maint/shadow>
+//! - [`shadow(3)`](https://www.man7.org/linux/man-pages/man3/shadow.3.html)
+//! - [`getspnam(3)`](https://www.man7.org/linux/man-pages/man3/getspnam.3.html)
 
 use std::ffi::CString;
 use std::io;
@@ -13,21 +14,11 @@ use mk_common::*;
 pub type Uid = libc::uid_t;
 pub type Gid = libc::gid_t;
 
-/// Raw bindings to shadow headers.
-mod ffi {
-    #![allow(unused)]
-    #![allow(non_snake_case)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_upper_case_globals)]
-    #![allow(clippy::upper_case_acronyms)]
-    #![allow(clippy::redundant_static_lifetimes)]
-
-    include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
-}
+/// Shadow routines are not thread safe. This is a safe guard against thread races.
+/// See <https://www.man7.org/linux/man-pages/man3/getspnam.3.html#ATTRIBUTES>.
+static SPNAME_LOCK: GlobalFunctionLock = GlobalFunctionLock::new(false);
 
 /// A single entry in the shadow file.
-///
-/// See <https://linux.die.net/man/3/shadow> for more.
 #[derive(Debug, Clone)]
 pub struct Spwd {
     /// User's login name.
@@ -69,10 +60,6 @@ impl Spwd {
     ///
     /// `ptr` must be a valid pointer to a [`libc::spwd`].
     pub unsafe fn from_raw(ptr: *mut libc::spwd) -> io::Result<Self> {
-        if ptr.is_null() {
-            io_bail!(InvalidData, "null pointer");
-        }
-
         let raw = *ptr;
 
         Ok(Self {
@@ -118,7 +105,22 @@ impl Spwd {
     ///
     /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_name(name: &str) -> io::Result<Self> {
-        unsafe { Self::from_raw(libc::getspnam(CString::new(name)?.as_ptr())) }
+        // SAFETY: shadow routines return a null pointer if an entry is not available, or if some
+        // other error occurs during processing. We handle this with an early exit. Thread races
+        // are checked using the global `SPNAME_LOCK`.
+        unsafe {
+            let ptr = function_lock!(
+                SPNAME_LOCK,
+                libc::getspnam(CString::new(name)?.as_ptr()),
+                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            )?;
+
+            if ptr.is_null() {
+                io_bail!(InvalidData, "null pointer");
+            }
+
+            Self::from_raw(ptr)
+        }
     }
 
     /// Get a [`Spwd`] entry from a [`mk_pwd::Passwd`] entry.
@@ -127,6 +129,21 @@ impl Spwd {
     ///
     /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_passwd(pwd: &mk_pwd::Passwd) -> io::Result<Self> {
-        unsafe { Self::from_raw(libc::getspnam(CString::new(&pwd.name[..])?.as_ptr())) }
+        // SAFETY: shadow routines return a null pointer if an entry is not available, or if some
+        // other error occurs during processing. We handle this with an early exit. Thread races
+        // are checked using the global `SPNAME_LOCK`.
+        unsafe {
+            let ptr = function_lock!(
+                SPNAME_LOCK,
+                libc::getspnam(CString::new(&pwd.name[..])?.as_ptr()),
+                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            )?;
+
+            if ptr.is_null() {
+                io_bail!(InvalidData, "null pointer");
+            }
+
+            Self::from_raw(ptr)
+        }
     }
 }

@@ -3,16 +3,13 @@
 use std::io;
 use thiserror::Error as ThisError;
 
-#[cfg(feature = "pam")]
-use mk_pam::{PamError, RawError};
-
 /// All error types that we handle.
 #[derive(ThisError, Debug)]
 pub enum MkError {
     /// PAM error.
     #[error("{0}")]
     #[cfg(feature = "pam")]
-    Pam(RawError),
+    Pam(mk_pam::RawError),
 
     /// IO Error.
     #[error("{0}")]
@@ -20,11 +17,11 @@ pub enum MkError {
 }
 
 #[cfg(feature = "pam")]
-impl From<PamError> for MkError {
-    fn from(e: PamError) -> Self {
+impl From<mk_pam::PamError> for MkError {
+    fn from(e: mk_pam::PamError) -> Self {
         match e {
-            PamError::Raw(r) => Self::Pam(r),
-            PamError::Io(r) => Self::Io(r),
+            mk_pam::PamError::Raw(r) => Self::Pam(r),
+            mk_pam::PamError::Io(r) => Self::Io(r),
         }
     }
 }

@@ -59,7 +59,7 @@ impl TryFrom<*const ffi::pam_message> for Message {
         }
 
         let value = unsafe { *value };
-        let msg = cstr_to_string(value.msg as *mut i8)?;
+        let msg = unsafe { cstr_to_string(value.msg as *mut c_char)? };
 
         match value.msg_style as u32 {
             ffi::PAM_PROMPT_ECHO_OFF => Ok(Self::Prompt(msg)),
@@ -77,7 +77,7 @@ pub struct Response {
     /// The actual response.
     pub resp: String,
     /// Unused - 0 is expected.
-    pub retcode: i32,
+    pub retcode: i64,
 }
 
 impl TryFrom<Response> for ffi::pam_response {
@@ -86,7 +86,7 @@ impl TryFrom<Response> for ffi::pam_response {
     fn try_from(value: Response) -> Result<Self, Self::Error> {
         Ok(ffi::pam_response {
             resp: CString::new(value.resp)?.into_raw(),
-            resp_retcode: value.retcode,
+            resp_retcode: value.retcode as c_int,
         })
     }
 }
@@ -123,7 +123,7 @@ pub(crate) extern "C" fn __raw_pam_conv(
         let mut responses = Vec::new();
 
         for i in 0..num_msgs as isize {
-            let raw_msg = unsafe { *raw_msgs.offset(i) };
+            let raw_msg = unsafe { (*raw_msgs).offset(i) };
 
             // Create message
             let contents = match unsafe { cstr_to_string((*raw_msg).msg as *mut c_char) } {

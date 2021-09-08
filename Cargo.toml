@@ -11,7 +11,8 @@ name = "mk"
 
 license = "MIT"
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
+rust-version = "1.56"
 authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 
 [profile.release]
@@ -37,7 +38,7 @@ mk-shadow = { path = "crates/mk-shadow", optional = true }
 pam = ["mk-pam"]
 
 # Shadow file authentication.
-# Only available if `shadow-utils` is available.
+# Only available if `shadow.h` is available.
 shadow = ["mk-shadow"]
 
 [[bin]]

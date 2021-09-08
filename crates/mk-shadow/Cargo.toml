@@ -1,16 +1,13 @@
 [package]
 name = "mk-shadow"
 
-build = "build/build.rs"
 license = "MIT"
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
+rust-version = "1.56"
 authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 
 [dependencies]
 libc = "0.2"
 mk-pwd = { path = "../mk-pwd" }
 mk-common = { path = "../mk-common" }
-
-[build-dependencies]
-bindgen = "0.59"

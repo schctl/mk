@@ -44,14 +44,14 @@ impl PwdAuthenticator {
         #[cfg(feature = "shadow")]
         let password = match &password[..] {
             // Not sure how to handle this
-            "*" => io_bail!(PermissionDenied, "disallowed login"),
+            "*" => io_bail!(PermissionDenied, "Disallowed login"),
             // > On most modern systems, this field is set to x, and the user password is stored in
             // > the /etc/shadow file.
             "x" => {
                 let spwd = mk_shadow::Spwd::from_name(&user.name[..])?;
 
                 if let "*" | "!" = &spwd.password[..] {
-                    io_bail!(PermissionDenied, "disallowed login")
+                    io_bail!(PermissionDenied, "Disallowed login")
                 }
 
                 spwd.password
@@ -61,7 +61,7 @@ impl PwdAuthenticator {
 
         #[cfg(not(feature = "shadow"))]
         let password = match &password[..] {
-            "*" | "x" => io_bail!(PermissionDenied, "disallowed login"),
+            "*" | "x" => io_bail!(PermissionDenied, "Disallowed login"),
             _ => password,
         };
 

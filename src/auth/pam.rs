@@ -1,6 +1,4 @@
-//! User authentication using [`PAM`].
-//!
-//! [`PAM`]: <https://www.ibm.com/docs/en/aix/7.1?topic=system-pluggable-authentication-modules>
+//! User authentication using PAM.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
