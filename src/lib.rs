@@ -6,28 +6,16 @@
 //! | Flag | Description | Requires | Rust |
 //! |------|-------------|----------|------|
 //! | `pam` | Builds with authenticator support for [`PAM`](https://en.wikipedia.org/wiki/Pluggable_authentication_module) | A `PAM` implementation ([`Linux-PAM`](http://www.linux-pam.org/), [`OpenPAM`](https://www.openpam.org/)) | 1.56.0-nightly  |
-//! | `shadow` | Builds with support for authentication using [`shadow-utils`](https://github.com/shadow-maint/shadow) | System provided `shadow.h` | 1.45+ |
+//! | `shadow` | Builds with support for authentication using [`shadow-utils`](https://github.com/shadow-maint/shadow) | System provided `shadow.h` | 1.54+ |
 
 #[macro_use]
 pub mod util;
 
-mod auth;
-mod cli;
-mod config;
-mod errors;
-mod options;
-mod prelude;
+pub mod auth;
+pub mod cli;
+pub mod config;
+pub mod errors;
+pub mod options;
+pub mod prelude;
 
 pub use errors::*;
-
-use config::Config;
-
-fn main() {
-    let mut app = cli::App::new(Config {}).unwrap();
-
-    match app.run(cli::options_from_terminal().unwrap()) {
-        Err(e) => eprintln!("{}", e),
-        Ok(Some(e)) => ::std::process::exit(e),
-        _ => {}
-    };
-}

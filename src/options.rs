@@ -26,8 +26,11 @@ impl CommandOptions {
 
 /// All runtime options for `mk`.
 #[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum MkOptions {
+    None,
     Command(CommandOptions),
     Text(String),
+    Error(String),
 }

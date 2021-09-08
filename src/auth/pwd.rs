@@ -65,7 +65,10 @@ impl PwdAuthenticator {
             _ => password,
         };
 
-        if !pwhash::unix::verify(&prompt!(true, "[{}] Password: ", user.name)?, &password[..]) {
+        if !pwhash::unix::verify(
+            &password_from_tty!("[{}] Password: ", user.name)?,
+            &password[..],
+        ) {
             io_bail!(PermissionDenied, "Authentication failed");
         }
 

@@ -36,13 +36,17 @@ impl App {
 
         #[allow(unreachable_patterns)]
         match options {
-            MkOptions::Command(cmd) => Ok(self.exec(cmd)?),
+            MkOptions::Command(cmd) => return self.exec(cmd),
             MkOptions::Text(help) => {
                 println!("{}", help);
-                Ok(None)
             }
-            _ => Ok(None),
+            MkOptions::Error(help) => {
+                eprintln!("{}", help);
+            }
+            _ => {}
         }
+
+        Ok(None)
     }
 
     /// Execute a command with the given `options`.
@@ -60,8 +64,9 @@ impl App {
             command.args(options.args);
 
             // Clear environment and set new variables
+            command.env_clear();
+
             if let Some(vars) = options.env {
-                command.env_clear();
                 command.envs(vars);
             }
 

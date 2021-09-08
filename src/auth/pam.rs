@@ -34,21 +34,23 @@ impl PamAuthenticator {
             }
         }
 
-        let username_str = user.name.clone();
-
         // Create conversation function
         let conv = pam::conv::Conversation {
             conv: Box::new(move |msg| match msg {
                 pam::conv::Message::PromptEcho(m) | pam::conv::Message::Prompt(m) => {
                     Some(pam::conv::Response {
-                        resp: match prompt!(
-                            m.to_lowercase().contains("password"),
-                            "[{}] {}",
-                            username_str,
-                            m
-                        ) {
-                            Ok(p) => p,
-                            Err(_) => return None,
+                        resp: {
+                            if m.to_lowercase().contains("password") {
+                                match password_from_tty!("[{}] {}", SERVICE_NAME, m) {
+                                    Ok(p) => p,
+                                    Err(_) => return None,
+                                }
+                            } else {
+                                match prompt_from_tty!("[{}] {}", SERVICE_NAME, m) {
+                                    Ok(s) => s,
+                                    Err(_) => return None,
+                                }
+                            }
                         },
                         retcode: 0,
                     })

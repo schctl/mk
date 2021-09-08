@@ -39,3 +39,7 @@ pam = ["mk-pam"]
 # Shadow file authentication.
 # Only available if `shadow-utils` is available.
 shadow = ["mk-shadow"]
+
+[[bin]]
+name = "mk"
+path = "src/bin/mk.rs"
