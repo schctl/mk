@@ -17,6 +17,7 @@ authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 
 [profile.release]
 lto = true
+panic = 'abort'
 codegen-units = 1
 
 [dependencies]
@@ -25,13 +26,22 @@ libc = "0.2"
 pwhash = "1.0"
 rpassword = "5.0"
 thiserror = "1.0"
-clap = "3.0.0-beta.4"
-
-mk-common = { path = "crates/mk-common" }
 
 mk-pwd = { path = "crates/mk-pwd" }
+mk-common = { path = "crates/mk-common" }
 mk-pam = { path = "crates/mk-pam", optional = true }
 mk-shadow = { path = "crates/mk-shadow", optional = true }
+
+[dependencies.clap]
+version = "3.0.0-beta.4"
+default-features = false
+
+features = [
+    "std",
+    "suggestions",
+    "color",
+    "wrap_help"
+]
 
 [features]
 # PAM authentication.

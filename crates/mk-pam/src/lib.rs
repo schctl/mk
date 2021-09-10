@@ -1,13 +1,18 @@
 //! Rust interface to PAM (Pluggable Authentication Modules).
 //!
-//! This crate provides **experimental** safe interfaces to PAM as well.
+//! ## Feature flags
+//!
+//! - `linux-pam`: Supported for Linux-PAM extensions.
+//! - `open-pam`: Supported for OpenPAM extensions.
 //!
 //! ## Potentially useful links
 //!
-//! - [`OpenPAM`](https://www.openpam.org/wiki>)
-//! - [`Linux-PAM`](http://www.linux-pam.org/)
-//! - [The Linux-PAM Application Developers' Guide](http://uw714doc.sco.com/en/SEC_pam/pam_appl.html)
+//! - [OpenPAM](https://www.openpam.org/wiki>)
+//! - [Linux-PAM](http://www.linux-pam.org/)
+//! - [RHEL docs](https://web.mit.edu/rhel-doc/5/RHEL-5-manual/Deployment_Guide-en-US/ch-pam.html)
+//! - [Oracle docs](https://docs.oracle.com/cd/E23824_01/html/821-1456/pam-2.html)
 //! - [IBM docs](https://www.ibm.com/docs/en/aix/7.2?topic=system-pluggable-authentication-modules)
+//! - [The Linux-PAM Application Developers' Guide](http://uw714doc.sco.com/en/SEC_pam/pam_appl.html)
 //! - [Wikipedia](https://en.wikipedia.org/wiki/Pluggable_authentication_module)
 
 #![feature(vec_into_raw_parts)]
@@ -28,12 +33,8 @@ pub use errors::*;
 /// Raw bindings to PAM headers.
 pub mod ffi {
     // ow.
-    #![allow(unused)]
-    #![allow(non_snake_case)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_upper_case_globals)]
-    #![allow(clippy::upper_case_acronyms)]
-    #![allow(clippy::redundant_static_lifetimes)]
+    #![allow(unused, non_snake_case, non_camel_case_types, non_upper_case_globals)]
+    #![allow(clippy::upper_case_acronyms, clippy::redundant_static_lifetimes)]
 
     include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
 }

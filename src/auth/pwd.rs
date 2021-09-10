@@ -17,6 +17,9 @@ pub struct PwdAuthenticator {
     users: HashMap<Uid, Instant>,
 }
 
+unsafe impl Send for PwdAuthenticator {}
+unsafe impl Sync for PwdAuthenticator {}
+
 impl Default for PwdAuthenticator {
     fn default() -> Self {
         Self::new()

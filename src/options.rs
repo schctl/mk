@@ -1,6 +1,6 @@
 //! `mk` runtime options.
 
-use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// Run a command as another user.
 #[derive(Debug, Clone)]
@@ -12,7 +12,15 @@ pub struct CommandOptions {
     /// Arguments to pass to the command.
     pub args: Vec<String>,
     /// Environment variable mappings.
-    pub env: Option<HashMap<String, String>>,
+    pub preserve_env: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct EditOptions {
+    /// Requested user to edit the file as.
+    pub target: mk_pwd::Passwd,
+    /// Path of file to edit.
+    pub path: PathBuf,
 }
 
 /// All runtime options for `mk`.
@@ -22,5 +30,6 @@ pub struct CommandOptions {
 pub enum MkOptions {
     None,
     Command(CommandOptions),
+    Edit(EditOptions),
     Text(String),
 }

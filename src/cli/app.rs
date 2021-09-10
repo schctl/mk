@@ -63,12 +63,7 @@ impl App {
             // Set arguments
             command.args(options.args);
 
-            // Clear environment and set new variables
-            command.env_clear();
-
-            if let Some(vars) = options.env {
-                command.envs(vars);
-            }
+            // TODO: env preservation
 
             // Wait on child
             if let Some(c) = command.spawn()?.wait()?.code() {

@@ -59,6 +59,9 @@ pub struct PamAuthenticator {
     users: HashMap<Uid, Instant>,
 }
 
+unsafe impl Send for PamAuthenticator {}
+unsafe impl Sync for PamAuthenticator {}
+
 impl Default for PamAuthenticator {
     fn default() -> Self {
         Self::new()

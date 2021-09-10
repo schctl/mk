@@ -10,6 +10,7 @@
 ### Requirements
 
  - Rust 1.56+
+ - A C compiler
  - [Bindgen requirements](https://rust-lang.github.io/rust-bindgen/requirements.html)
 
 ### Feature flags
@@ -30,10 +31,9 @@ cargo build --features $(./s.py)
 ---
 
 
-### Disclaimers
+### Disclaimer
 
- - I am not an expert, and this project is still very early in development. Don't use this anywhere except for testing.
- - Linux support is targeted first.
+I am not an expert, and this project is still very early in development. Don't use this anywhere except for testing.
 
 ### License
 

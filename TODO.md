@@ -1,0 +1,5 @@
+ - `--preserve-env` impl.
+ - `--edit` impl
+ - Get started on BSD auth.
+ - Config parsing.
+   - User rules (eg `nopass`, and permits).

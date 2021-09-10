@@ -17,7 +17,7 @@ FEATURES = {
     # --- Top level requirements ---
     '': {
         'headers': ['pwd'],
-        'dylibs': ['crypt']
+        'dylibs': []
     },
     # ------------------------------
     'shadow': {
@@ -60,8 +60,8 @@ def maybe_feature(feat: str) -> bool:
         defs = []
 
         # Get required libraries to link to
-        if 'links' in FEATURES[feat]:
-            links.extend(FEATURES[feat]['links'])
+        if 'dylibs' in FEATURES[feat]:
+            links.extend(FEATURES[feat]['dylibs'])
 
         # Get required header files to include
         if 'headers' in FEATURES[feat]:

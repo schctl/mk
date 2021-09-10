@@ -1,6 +1,7 @@
 //! CLI option parsing utilities.
 
 use std::ffi::OsString;
+use std::path::PathBuf;
 
 use clap::{App, AppSettings, Arg};
 
@@ -15,20 +16,28 @@ where
 {
     let mut app = App::new(SERVICE_NAME)
         .about(DESCRIPTION)
-        .version(clap::crate_version!())
+        .version(VERSION)
         .setting(AppSettings::AllowExternalSubcommands)
+        .setting(AppSettings::ColoredHelp)
         .arg(
             Arg::new("user")
                 .short('u')
                 .long("user")
                 .takes_value(true)
-                .about("User to run the command as.")
+                .about("Target user to run the command as")
                 .default_value("root"),
         )
         .arg(
             Arg::new("preserve-env")
+                .short('E')
                 .long("preserve-env")
                 .about("Preserve existing environment variables"),
+        )
+        .arg(
+            Arg::new("edit")
+                .short('e')
+                .long("edit")
+                .about("Edit a file as the target user"),
         );
 
     let usage = app.generate_usage();
@@ -44,31 +53,38 @@ where
         }
     };
 
+    let target = mk_pwd::Passwd::from_name(match matches.value_of("user") {
+        Some(u) => u,
+        None => "root",
+    })?;
+
+    // Parse edit options
+    if let Some(e) = matches.value_of("edit") {
+        return Ok(MkOptions::Edit(EditOptions {
+            target,
+            path: PathBuf::from(e),
+        }));
+    }
+
     // Parse command options from external subcommand
-    let opts = match matches.subcommand() {
-        Some((ext_cmd, ext_args)) => {
-            let target = mk_pwd::Passwd::from_name(match matches.value_of("user") {
-                Some(u) => u,
-                None => "root",
-            })?;
+    if let Some((ext_cmd, ext_args)) = matches.subcommand() {
+        let target = mk_pwd::Passwd::from_name(match matches.value_of("user") {
+            Some(u) => u,
+            None => "root",
+        })?;
 
-            let args = match ext_args.values_of("") {
-                Some(v) => v.into_iter().map(|s| s.to_string()).collect(),
-                _ => Vec::new(),
-            };
+        let args = match ext_args.values_of("") {
+            Some(v) => v.into_iter().map(|s| s.to_string()).collect(),
+            _ => Vec::new(),
+        };
 
-            // TODO: for now
-            let env = None;
+        return Ok(MkOptions::Command(CommandOptions {
+            target,
+            command: ext_cmd.to_string(),
+            args,
+            preserve_env: matches.is_present("preserve-env"),
+        }));
+    }
 
-            MkOptions::Command(CommandOptions {
-                target,
-                command: ext_cmd.to_string(),
-                args,
-                env,
-            })
-        }
-        _ => MkOptions::Text(usage),
-    };
-
-    Ok(opts)
+    Ok(MkOptions::Text(usage))
 }

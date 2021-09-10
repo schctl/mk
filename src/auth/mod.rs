@@ -13,7 +13,7 @@ use crate::prelude::*;
 ///
 /// Additional required information must be held by the implementer. The intention is for an
 /// Authenticator to be dumped to a file and recovered between sessions.
-pub trait Authenticator {
+pub trait Authenticator: Send + Sync {
     /// Run a function in an authenticated session.
     fn session<'a>(
         &mut self,

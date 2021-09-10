@@ -1,4 +1,4 @@
-//! Rust interface to the system provided `shadow.h`.
+//! Rust interface to the system provided shadow routines.
 //!
 //! ## Potentially useful links
 //!
