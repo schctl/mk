@@ -12,24 +12,22 @@ pub type Gid = libc::gid_t;
 
 /// `getpwnam` is not thread safe. This is a safe guard against thread races.
 /// See <https://man7.org/linux/man-pages/man3/getpwnam.3p.html#DESCRIPTION>.
-static PWNAME_LOCK: GlobalFunctionLock = GlobalFunctionLock::new(false);
+static PWNAME_LOCK: ResourceLock = ResourceLock::new(false);
 
 /// A single entry in the password database.
 ///
-/// See <https://linux.die.net/man/5/passwd> for more.
+/// See [`passwd(5)`](https://man7.org/linux/man-pages/man5/passwd.5.html) for more.
 #[derive(Debug, Clone)]
 pub struct Passwd {
     /// User's login name.
     pub name: String,
     /// This is either the encrypted user password, an asterisk (*), or the letter 'x'.
-    ///
-    /// See <https://www.man7.org/linux/man-pages/man5/group.5.html> for more.
     pub password: Option<String>,
     /// User's unique ID.
     pub uid: Uid,
     /// User's numeric primary group ID.
     pub gid: Gid,
-    /// Used for informational purposes, sometimes called the comment field.
+    /// Comment field, ssed for informational purposes.
     pub gecos: Option<String>,
     /// User's home directory.
     pub directory: String,
@@ -39,10 +37,6 @@ pub struct Passwd {
 
 impl Passwd {
     /// Get a `passwd` entry from a raw [`libc::passwd`] pointer.
-    ///
-    /// # Errors
-    ///
-    /// - [`io::Error`] of kind [`io::ErrorKind::InvalidData`] - when the pointer is null.
     ///
     /// # Safety
     ///
@@ -78,14 +72,17 @@ impl Passwd {
         // other error occurs during processing. We handle this with an early exit. Thread races
         // are checked using the global `PWNAME_LOCK`.
         unsafe {
-            let ptr = function_lock!(
-                PWNAME_LOCK,
-                libc::getpwuid(uid),
-                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            let ptr = fn_lock(
+                &PWNAME_LOCK,
+                || libc::getpwuid(uid),
+                || io::Error::new(io::ErrorKind::Interrupted, "thread locked"),
             )?;
 
             if ptr.is_null() {
-                io_bail!(InvalidData, "null pointer");
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("could not find user with UID {}", uid),
+                ));
             }
 
             Self::from_raw(ptr)
@@ -102,14 +99,19 @@ impl Passwd {
         // other error occurs during processing. We handle this with an early exit. Thread races
         // are checked using the global `PWNAME_LOCK`.
         unsafe {
-            let ptr = function_lock!(
-                PWNAME_LOCK,
-                libc::getpwnam(CString::new(name)?.as_ptr()),
-                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            let cname = CString::new(name)?;
+
+            let ptr = fn_lock(
+                &PWNAME_LOCK,
+                || libc::getpwnam(cname.as_ptr()),
+                || io::Error::new(io::ErrorKind::Interrupted, "thread locked"),
             )?;
 
             if ptr.is_null() {
-                io_bail!(InvalidData, "null pointer");
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("could not find user {}", name),
+                ));
             }
 
             Self::from_raw(ptr)

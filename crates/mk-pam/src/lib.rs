@@ -13,11 +13,11 @@
 #![feature(vec_into_raw_parts)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-use std::os::raw::{c_int, c_void};
-use std::sync::atomic::AtomicI32;
+use std::io;
+use std::os::raw::{c_char, c_int, c_void};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::{convert::TryFrom, ffi::CString};
 
-use mk_common::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 pub mod conv;
@@ -27,6 +27,7 @@ pub use errors::*;
 
 /// Raw bindings to PAM headers.
 pub mod ffi {
+    // ow.
     #![allow(unused)]
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
@@ -40,8 +41,9 @@ pub mod ffi {
 // See http://uw714doc.sco.com/en/SEC_pam/pam_appl-3.html
 
 /// PAM item types.
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(i32)]
+#[non_exhaustive]
 pub enum ItemType {
     /// The name of the requesting service.
     Service = ffi::PAM_SERVICE as i32,
@@ -51,8 +53,8 @@ pub enum ItemType {
     UserPrompt = ffi::PAM_USER_PROMPT as i32,
     /// The terminal name.
     ///
-    /// The name must be prefixed by /dev/ if it is a device file. For graphical, X-based,
-    /// applications the value for this item should be the $DISPLAY variable.
+    /// The name must be prefixed by `/dev/` if it is a device file. For graphical, X-based,
+    /// applications the value for this item should be the `DISPLAY` environment variable.
     Tty = ffi::PAM_TTY as i32,
     /// The name of the user requesting authentication (the applicant).
     ///
@@ -71,6 +73,7 @@ pub enum ItemType {
 }
 
 /// Information corresponding to an [`ItemType`].
+#[derive(Debug)]
 pub enum Item {
     /// See [`ItemType::Service`].
     Service(String),
@@ -92,13 +95,117 @@ pub enum Item {
     Conversation(conv::Conversation),
 }
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone)]
+bitflags::bitflags! {
+    /// General PAM flags.
+    pub struct Flag: i32 {
+        /// Do not emit any messages.
+        const SILENT = ffi::PAM_SILENT as i32;
+        /// Fail if the user does not have an authentication token.
+        const DISALLOW_NO_AUTH_TOKEN = ffi::PAM_DISALLOW_NULL_AUTHTOK as i32;
+    }
+}
+
+/// A PAM message.
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(i32)]
-pub enum Flags {
-    /// Do not emit any messages.
-    Silent = ffi::PAM_SILENT as i32,
-    /// Fail if the user does not have an authentication token.
-    DissallowNoAuthToken = ffi::PAM_DISALLOW_NULL_AUTHTOK as i32,
+#[non_exhaustive]
+pub enum MessageType {
+    /// Obtain a string without echoing any text.
+    Prompt = ffi::PAM_PROMPT_ECHO_OFF as i32,
+    /// Obtain a string while echoing some text.
+    PromptEcho = ffi::PAM_PROMPT_ECHO_ON as i32,
+    /// Display an error message.
+    ShowError = ffi::PAM_ERROR_MSG as i32,
+    /// Display some text.
+    ShowText = ffi::PAM_TEXT_INFO as i32,
+}
+
+/// A PAM message.
+#[derive(Debug)]
+pub struct Message {
+    /// The actual message.
+    msg: String,
+    /// The type of message.
+    kind: MessageType,
+}
+
+impl Message {
+    /// Create a new PAM message.
+    #[must_use]
+    pub fn new(msg: String, kind: MessageType) -> Self {
+        Self { msg, kind }
+    }
+
+    /// Get the actual message contained.
+    pub fn get(&self) -> &String {
+        &self.msg
+    }
+
+    /// Get the type of message contained.
+    pub fn kind(&self) -> MessageType {
+        self.kind
+    }
+}
+
+impl TryFrom<*const ffi::pam_message> for Message {
+    type Error = PamError;
+
+    /// Convert a raw *[`ffi::pam_message`] to a [`Message`]. Returns the
+    /// message contents as a [`String`] if it is of an unknown type.
+    fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
+        if value.is_null() {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer").into());
+        }
+
+        let value = unsafe { *value };
+        let msg = unsafe { mk_common::cstr_to_string(value.msg as *mut c_char)? };
+
+        Ok(Self {
+            msg,
+            kind: match value.msg_style.try_into() {
+                Ok(k) => k,
+                Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e).into()),
+            },
+        })
+    }
+}
+
+/// A response to a PAM message.
+#[derive(Debug, Clone)]
+pub struct Response {
+    /// The actual response.
+    pub resp: String,
+    /// Unused - 0 is expected.
+    pub retcode: i64,
+}
+
+impl Response {
+    /// Create a new PAM message response.
+    #[must_use]
+    pub fn new(resp: String, retcode: i64) -> Self {
+        Self { resp, retcode }
+    }
+
+    /// Get the actual response contained.
+    pub fn get(&self) -> &String {
+        &self.resp
+    }
+
+    /// Reserved field.
+    pub fn retcode(&self) -> i64 {
+        self.retcode
+    }
+}
+
+impl TryFrom<Response> for ffi::pam_response {
+    type Error = PamError;
+
+    fn try_from(value: Response) -> Result<Self, Self::Error> {
+        Ok(ffi::pam_response {
+            resp: CString::new(value.resp)?.into_raw(),
+            resp_retcode: value.retcode as c_int,
+        })
+    }
 }
 
 /// Represents a PAM handle.
@@ -119,7 +226,7 @@ impl Handle {
     /// Following a successful return, the contents of `*pamh` is a handle that provides continuity for
     /// successive calls to the PAM library.
     ///
-    /// *This is a safe interface to [`ffi::pam_start`]. To see more, here are a few links:*
+    /// *This is a safe interface to [`ffi::pam_start`]. To read more, here are a few links:*
     /// - <http://uw714doc.sco.com/en/SEC_pam/pam_appl-3.html>
     /// - <https://linux.die.net/man/3/pam_start>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-start-3pam.html>
@@ -157,7 +264,7 @@ impl Handle {
                 as i32;
 
         if pamh.is_null() {
-            io_bail!(InvalidData, "null pointer");
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer").into());
         };
 
         match RawError::try_from(ret as i32) {
@@ -174,22 +281,16 @@ impl Handle {
     /// This is the last function an application should call for this context, and free all
     /// resources allocated to it.
     ///
-    /// *This function is a safe interface to [`ffi::pam_end`]. To see more, here are a few links:*
+    /// *This function is a safe interface to [`ffi::pam_end`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_end>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-end-3pam.html>
-    pub fn end(self) -> PamResult<()> {
-        let ret =
-            unsafe { ffi::pam_end(self.interior, self.last_retcode.into_inner() as c_int) } as i32;
-
-        match RawError::try_from(ret) {
-            Ok(e) => Err(e.into()),
-            Err(_) => Ok(()),
-        }
+    pub fn end(self) {
+        // drop
     }
 
     /// Access and update information of a PAM item type.
     ///
-    /// *This function is a safe interface to [`ffi::pam_set_item`]. To see more, here are a few links:*
+    /// *This function is a safe interface to [`ffi::pam_set_item`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_set_item>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-set-item-3pam.html>
     pub fn set_item(&self, item: Item) -> PamResult<()> {
@@ -275,17 +376,18 @@ impl Handle {
     /// The name of the authenticated user will be present in the PAM item PAM_USER. This item may
     /// be recovered with a call to [`ffi::pam_get_item`].
     ///
-    /// *This function is a safe interface to [`ffi::pam_authenticate`]. To see more, here are a few links:*
+    /// *This function is a safe interface to [`ffi::pam_authenticate`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_authenticate>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-authenticate-3pam.html>
-    pub fn authenticate(&self, flags: Option<i32>) -> PamResult<()> {
+    pub fn authenticate(&self, flags: Option<Flag>) -> PamResult<()> {
         let ret = unsafe {
             ffi::pam_authenticate(
                 self.interior,
                 match flags {
                     Some(f) => f,
-                    None => ffi::PAM_SUCCESS as i32,
-                } as c_int,
+                    None => Flag::empty(),
+                }
+                .bits() as c_int,
             )
         } as i32;
 
@@ -304,17 +406,18 @@ impl Handle {
     /// restrictions, and verifies that the user is permitted to gain access to the system at this time.
     /// An [`Err`] is returned if validation of the user's account failed.
     ///
-    /// *This is a safe interface to [`ffi::pam_acct_mgmt`]. To see more, here are a few links:*
+    /// *This is a safe interface to [`ffi::pam_acct_mgmt`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_acct_mgmt>
     /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-acct-mgmt-3pam.html>
-    pub fn validate(&self, flags: Option<i32>) -> PamResult<()> {
+    pub fn validate(&self, flags: Option<Flag>) -> PamResult<()> {
         let ret = unsafe {
             ffi::pam_acct_mgmt(
                 self.interior,
                 match flags {
                     Some(f) => f,
-                    None => ffi::PAM_SUCCESS as i32,
-                } as c_int,
+                    None => Flag::empty(),
+                }
+                .bits() as c_int,
             )
         } as i32;
 
@@ -329,17 +432,18 @@ impl Handle {
 
     /// Change the authentication token of the user associated with this handle.
     ///
-    /// *This function is a safe interface to [`ffi::pam_chauthtok`]. To see more, here are a few links:*
+    /// *This function is a safe interface to [`ffi::pam_chauthtok`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_chauthtok>
     /// - <https://docs.oracle.com/cd/E86824_01/html/E54770/pam-chauthtok-3pam.html>
-    pub fn change_auth_token(&self, flags: Option<i32>) -> PamResult<()> {
+    pub fn change_auth_token(&self, flags: Option<Flag>) -> PamResult<()> {
         let ret = unsafe {
             ffi::pam_chauthtok(
                 self.interior,
                 match flags {
                     Some(f) => f,
-                    None => ffi::PAM_SUCCESS as i32,
-                } as c_int,
+                    None => Flag::empty(),
+                }
+                .bits() as c_int,
             )
         } as i32;
 
@@ -359,17 +463,18 @@ impl Handle {
     /// [`Handle::close_session`](crate::Handle::close_session). An [`Err`] is returned if a session
     /// could not be opened.
     ///
-    /// *This function is a safe interface to [`ffi::pam_open_session`]. To see more, here are a few links:*
+    /// *This function is a safe interface to [`ffi::pam_open_session`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_open_session>
     /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-open-session-3pam.html>
-    pub fn open_session(&self, flags: Option<i32>) -> PamResult<()> {
+    pub fn open_session(&self, flags: Option<Flag>) -> PamResult<()> {
         let ret = unsafe {
             ffi::pam_open_session(
                 self.interior,
                 match flags {
                     Some(f) => f,
-                    None => ffi::PAM_SUCCESS as i32,
-                } as c_int,
+                    None => Flag::empty(),
+                }
+                .bits() as c_int,
             )
         } as i32;
 
@@ -387,7 +492,7 @@ impl Handle {
     /// This function is used to indicate that an authenticated session has ended. See
     /// [`Handle::open_session`](crate::Handle::open_session) for more.
     ///
-    /// *This function is a safe interface to [`ffi::pam_close_session`]. To see more, here are a few links:*
+    /// *This function is a safe interface to [`ffi::pam_close_session`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_close_session>
     /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-close-session-3pam.html>
     pub fn close_session(&self, flags: Option<i32>) -> PamResult<()> {
@@ -408,5 +513,19 @@ impl Handle {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
+    }
+}
+
+impl Drop for Handle {
+    /// See documentation on [`Self::end`](crate::Handle::end).
+    fn drop(&mut self) {
+        // Usually the only errors that can happen are if the submitted handle is invalid, but we don't
+        // allow construction if PAM gives us an invalid handle.
+        let _ = unsafe {
+            ffi::pam_end(
+                self.interior,
+                self.last_retcode.load(Ordering::SeqCst) as c_int,
+            )
+        };
     }
 }

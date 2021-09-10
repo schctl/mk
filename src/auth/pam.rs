@@ -9,10 +9,60 @@ use mk_pwd::Uid;
 use super::Authenticator;
 use crate::prelude::*;
 
+/// Prompt a string.
+fn pam_prompt(msg: &str) -> Result<pam::Response, pam::RawError> {
+    Ok(pam::Response {
+        resp: {
+            if msg.to_lowercase().contains("password") {
+                match password_from_tty!("[{}] {}", SERVICE_NAME, msg) {
+                    Ok(p) => p,
+                    Err(_) => return Err(pam::RawError::Conversation),
+                }
+            } else {
+                match prompt_from_tty!("[{}] {}", SERVICE_NAME, msg) {
+                    Ok(s) => s,
+                    Err(_) => return Err(pam::RawError::Conversation),
+                }
+            }
+        },
+        retcode: 0,
+    })
+}
+
+/// Exported PAM conversation function.
+fn pam_conversation(messages: &mut [pam::conv::MessageContainer]) -> Result<(), pam::RawError> {
+    for msg in messages {
+        let resp = match msg.get().kind() {
+            pam::MessageType::PromptEcho | pam::MessageType::Prompt => {
+                Some(pam_prompt(&msg.get().get()[..])?)
+            }
+            pam::MessageType::ShowText => {
+                println!("[{}] {}", SERVICE_NAME, msg.get().get());
+                None
+            }
+            pam::MessageType::ShowError => {
+                eprintln!("[{}] {}", SERVICE_NAME, msg.get().get());
+                None
+            }
+            _ => None,
+        };
+
+        msg.set_response(resp);
+    }
+
+    Ok(())
+}
+
 /// PAM authentication structure. Holds all data required to begin a session with PAM.
 pub struct PamAuthenticator {
     /// List of all authenticated users and when they were authenticated.
     users: HashMap<Uid, Instant>,
+}
+
+impl Default for PamAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PamAuthenticator {
@@ -34,47 +84,18 @@ impl PamAuthenticator {
 
         // Create conversation function
         let conv = pam::conv::Conversation {
-            conv: Box::new(move |msg| match msg {
-                pam::conv::Message::PromptEcho(m) | pam::conv::Message::Prompt(m) => {
-                    Some(pam::conv::Response {
-                        resp: {
-                            if m.to_lowercase().contains("password") {
-                                match password_from_tty!("[{}] {}", SERVICE_NAME, m) {
-                                    Ok(p) => p,
-                                    Err(_) => return None,
-                                }
-                            } else {
-                                match prompt_from_tty!("[{}] {}", SERVICE_NAME, m) {
-                                    Ok(s) => s,
-                                    Err(_) => return None,
-                                }
-                            }
-                        },
-                        retcode: 0,
-                    })
-                }
-                pam::conv::Message::ShowText(m) => {
-                    println!("[{}] {}", SERVICE_NAME, m);
-                    None
-                }
-                pam::conv::Message::ShowError(m) => {
-                    eprintln!("[{}] {}", SERVICE_NAME, m);
-                    None
-                }
-            }),
+            conv: Box::new(pam_conversation),
         };
 
         let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], conv)?;
 
         // Set requesting user.
         if let Err(e) = handle.set_item(pam::Item::RequestUser(user.name.clone())) {
-            handle.end()?;
             return Err(e.into());
         }
 
         // Authenticate user.
         if let Err(e) = handle.authenticate(None) {
-            handle.end()?;
             return Err(e.into());
         }
 
@@ -82,7 +103,6 @@ impl PamAuthenticator {
         if let Err(pam::PamError::Raw(pam::RawError::NewAuthTokenRequired)) = handle.validate(None)
         {
             if let Err(e) = handle.change_auth_token(None) {
-                handle.end()?;
                 return Err(e.into());
             }
         }
@@ -98,10 +118,11 @@ impl Authenticator for PamAuthenticator {
         session: Box<dyn FnOnce() -> MkResult<()> + 'a>,
     ) -> MkResult<()> {
         let handle = self.create_context(user)?;
+
         handle.open_session(None)?;
         session()?;
         handle.close_session(None)?;
-        handle.end()?;
+
         Ok(())
     }
 }

@@ -17,6 +17,17 @@ pub fn get_euid() -> Uid {
     unsafe { libc::geteuid() }
 }
 
+/// Get the `PATH` variable from the environment.
+///
+/// Returns a fallback string if it is not available.
+#[must_use]
+pub fn get_path() -> String {
+    std::env::vars().find(|p| p.0 == "PATH").map_or(
+        String::from("/usr/local/sbin:/usr/local/bin:/usr/bin"),
+        |p| p.1,
+    )
+}
+
 /// Read a line from `/dev/tty`.
 pub fn readln_from_tty() -> io::Result<String> {
     let mut input = String::new();

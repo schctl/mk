@@ -1,7 +1,7 @@
 # mk (^∇^)-b
 
 
-`mk` is a tool to run unix commands as another user, and a family of crates. It is similar to [`doas`](https://github.com/Duncaen/OpenDoas) or [`sudo`](https://github.com/sudo-project/sudo).
+`mk` is a tool to run commands as another user, and a family of crates. It is similar to [`doas`](https://github.com/Duncaen/OpenDoas) or [`sudo`](https://github.com/sudo-project/sudo).
 
 ---
 
@@ -14,10 +14,10 @@
 
 ### Feature flags
 
-| Flag | Description | Requires |
-|------|-------------|----------|
-| `pam` | Builds with authenticator support for [`PAM`](https://en.wikipedia.org/wiki/Pluggable_authentication_module) | A `PAM` implementation ([`Linux-PAM`](http://www.linux-pam.org/), [`OpenPAM`](https://www.openpam.org/)) |
-| `shadow` | Builds with authenticator support for reading the shadow file | System provided `shadow.h` |
+| Flag | Description |
+|------|-------------|
+| `pam` | Builds with authenticator support for [`PAM`](https://en.wikipedia.org/wiki/Pluggable_authentication_module) |
+| `shadow` | Builds with authenticator support for reading shadow files |
 
 `s.py` attempts to output a list of supported features on your system.
 

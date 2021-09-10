@@ -1,4 +1,4 @@
-//! Environment setup utilities for running a command.
+//! CLI option parsing utilities.
 
 use std::ffi::OsString;
 
@@ -8,7 +8,7 @@ use crate::options::*;
 use crate::prelude::*;
 
 /// Parse runtime options from the command line using [`clap`].
-pub fn options_from_terminal<I, T>(iter: I) -> MkResult<MkOptions>
+pub fn from_terminal<I, T>(iter: I) -> MkResult<MkOptions>
 where
     I: IntoIterator<Item = T>,
     T: Into<String> + Clone,
@@ -44,25 +44,17 @@ where
         }
     };
 
+    // Parse command options from external subcommand
     let opts = match matches.subcommand() {
         Some((ext_cmd, ext_args)) => {
-            let target = match matches.value_of("user") {
-                Some(u) => match mk_pwd::Passwd::from_name(u) {
-                    Ok(p) => p,
-                    // Could not find user from the password database
-                    Err(e) => {
-                        return Ok(MkOptions::Error(format!(
-                            "Could not find user `{}`\nReason: \"{}\"",
-                            u, e
-                        )))
-                    }
-                },
-                _ => panic!(),
-            };
+            let target = mk_pwd::Passwd::from_name(match matches.value_of("user") {
+                Some(u) => u,
+                None => "root",
+            })?;
 
             let args = match ext_args.values_of("") {
                 Some(v) => v.into_iter().map(|s| s.to_string()).collect(),
-                None => Vec::new(),
+                _ => Vec::new(),
             };
 
             // TODO: for now

@@ -2,16 +2,12 @@
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::ffi::CString;
-use std::io;
-use std::os::raw::{c_char, c_int, c_void};
+use std::os::raw::{c_int, c_void};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use mk_common::*;
 
-use crate::errors::*;
-use crate::ffi;
+use crate::*;
 
 lazy_static! {
     /// Global conversation function pointers.
@@ -29,65 +25,50 @@ lazy_static! {
 /// Contains the PAM conversation function. This will be called by a loaded PAM module.
 pub struct Conversation {
     /// Unlike the regular PAM conversation function, this is called for every message provided.
-    pub conv: Box<dyn Fn(&Message) -> Option<Response>>,
+    pub conv: Box<dyn Fn(&mut [MessageContainer]) -> Result<(), RawError>>,
+}
+
+impl std::fmt::Debug for Conversation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PAM conversation function")
+    }
 }
 
 unsafe impl Send for Conversation {}
 unsafe impl Sync for Conversation {}
 
-/// A PAM message.
-#[derive(Debug, Clone)]
-pub enum Message {
-    /// Obtain a string without echoing any text.
-    Prompt(String),
-    /// Obtain a string while echoing some text.
-    PromptEcho(String),
-    /// Display an error message.
-    ShowError(String),
-    /// Display some text.
-    ShowText(String),
+/// Structure used in a PAM conversation, containing the message sent from a module,
+/// and its corresponding response, if any.
+#[derive(Debug)]
+pub struct MessageContainer {
+    msg: Message,
+    resp: Option<Response>,
 }
 
-impl TryFrom<*const ffi::pam_message> for Message {
-    type Error = io::Error;
-
-    /// Convert a raw *[`ffi::pam_message`] to a [`Message`]. Returns the
-    /// message contents as a [`String`] if it is of an unknown type.
-    fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
-        if value.is_null() {
-            io_bail!(InvalidData, "null pointer");
-        }
-
-        let value = unsafe { *value };
-        let msg = unsafe { cstr_to_string(value.msg as *mut c_char)? };
-
-        match value.msg_style as u32 {
-            ffi::PAM_PROMPT_ECHO_OFF => Ok(Self::Prompt(msg)),
-            ffi::PAM_PROMPT_ECHO_ON => Ok(Self::PromptEcho(msg)),
-            ffi::PAM_ERROR_MSG => Ok(Self::ShowError(msg)),
-            ffi::PAM_TEXT_INFO => Ok(Self::ShowText(msg)),
-            _ => io_err!(InvalidData, "unknown message style"),
-        }
+impl MessageContainer {
+    #[must_use]
+    pub fn new(msg: Message) -> Self {
+        Self { msg, resp: None }
     }
-}
 
-/// A response to a PAM message.
-#[derive(Debug, Clone)]
-pub struct Response {
-    /// The actual response.
-    pub resp: String,
-    /// Unused - 0 is expected.
-    pub retcode: i64,
-}
+    /// Get the internal PAM message.
+    pub fn get(&self) -> &Message {
+        &self.msg
+    }
 
-impl TryFrom<Response> for ffi::pam_response {
-    type Error = std::ffi::NulError;
+    /// Get the currently set response to the internal message.
+    pub fn get_response(&self) -> &Option<Response> {
+        &self.resp
+    }
 
-    fn try_from(value: Response) -> Result<Self, Self::Error> {
-        Ok(ffi::pam_response {
-            resp: CString::new(value.resp)?.into_raw(),
-            resp_retcode: value.retcode as c_int,
-        })
+    /// Set a new response to the internal message.
+    pub fn set_response(&mut self, resp: Option<Response>) {
+        self.resp = resp;
+    }
+
+    /// Return internal message and response.
+    pub fn into_raw_parts(self) -> (Message, Option<Response>) {
+        (self.msg, self.resp)
     }
 }
 
@@ -120,40 +101,38 @@ pub(crate) extern "C" fn __raw_pam_conv(
         // use that as index.
         .get(&(appdata_ptr as c_int))
     {
-        let mut responses = Vec::new();
+        // Collect messages
+        let mut messages = Vec::with_capacity(num_msgs as usize);
 
         for i in 0..num_msgs as isize {
-            let raw_msg = unsafe { (*raw_msgs).offset(i) };
+            messages.push(MessageContainer::new(
+                match unsafe { (*raw_msgs).offset(i) }.try_into() {
+                    Ok(m) => m,
+                    Err(_) => return RawError::Conversation.into(),
+                },
+            ));
+        }
 
-            // Create message
-            let contents = match unsafe { cstr_to_string((*raw_msg).msg as *mut c_char) } {
-                Ok(s) => s,
-                // I DON'T KNOW IF THESE RETURN CODES ARE CORRECT
-                // (but it should be fine for now)
-                Err(_) => return RawError::Buffer.into(),
-            };
+        // Call provided conversation function
+        if let Err(e) = (f.conv)(&mut messages[..]) {
+            return e.into();
+        };
 
-            let msg = match unsafe { (*raw_msg).msg_style as u32 } {
-                ffi::PAM_PROMPT_ECHO_OFF => Message::Prompt(contents),
-                ffi::PAM_PROMPT_ECHO_ON => Message::PromptEcho(contents),
-                ffi::PAM_TEXT_INFO => Message::ShowText(contents),
-                ffi::PAM_ERROR_MSG => Message::ShowError(contents),
-                // Error code - same here
-                _ => return RawError::Buffer.into(),
-            };
+        // Write responses
+        let mut responses = Vec::with_capacity(num_msgs as usize);
 
-            // Get response and write it
-            if let Some(resp) = (f.conv)(&msg) {
-                responses.push(match ffi::pam_response::try_from(resp) {
+        for m in messages {
+            responses.push(match m.into_raw_parts().1 {
+                Some(m) => match ffi::pam_response::try_from(m) {
                     Ok(r) => r,
-                    // Error code - same here
-                    Err(_) => return RawError::Buffer.into(),
-                })
-            }
+                    Err(_) => return RawError::Conversation.into(),
+                },
+                None => unsafe { std::mem::zeroed() },
+            })
         }
 
         unsafe { *raw_responses = responses.into_raw_parts().0 };
-    };
+    }
 
     ffi::PAM_SUCCESS as c_int
 }

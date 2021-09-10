@@ -3,9 +3,9 @@
 //! This is the fallback authenticator type, and is available on all platforms.
 
 use std::collections::HashMap;
+use std::io;
 use std::time::{Duration, Instant};
 
-use mk_common::*;
 use mk_pwd::Uid;
 
 use super::Authenticator;
@@ -15,6 +15,12 @@ use crate::prelude::*;
 pub struct PwdAuthenticator {
     /// List of all authenticated users and when they were authenticated.
     users: HashMap<Uid, Instant>,
+}
+
+impl Default for PwdAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PwdAuthenticator {
@@ -30,9 +36,9 @@ impl PwdAuthenticator {
         if let Some(u) = self.users.get(&user.uid) {
             if Instant::now() - *u < Duration::from_secs(600) {
                 return Ok(());
-            } else {
-                self.users.remove(&user.uid);
             }
+
+            self.users.remove(&user.uid);
         }
 
         // Authenticate if user doesn't have a password.
@@ -44,14 +50,22 @@ impl PwdAuthenticator {
         #[cfg(feature = "shadow")]
         let password = match &password[..] {
             // Not sure how to handle this
-            "*" => io_bail!(PermissionDenied, "Disallowed login"),
+            "*" => {
+                return Err(
+                    io::Error::new(io::ErrorKind::PermissionDenied, "disallowed login").into(),
+                )
+            }
             // > On most modern systems, this field is set to x, and the user password is stored in
             // > the /etc/shadow file.
             "x" => {
                 let spwd = mk_shadow::Spwd::from_name(&user.name[..])?;
 
                 if let "*" | "!" = &spwd.password[..] {
-                    io_bail!(PermissionDenied, "Disallowed login")
+                    return Err(io::Error::new(
+                        io::ErrorKind::PermissionDenied,
+                        "disallowed login",
+                    )
+                    .into());
                 }
 
                 spwd.password
@@ -61,15 +75,21 @@ impl PwdAuthenticator {
 
         #[cfg(not(feature = "shadow"))]
         let password = match &password[..] {
-            "*" | "x" => io_bail!(PermissionDenied, "Disallowed login"),
+            "*" | "x" => {
+                return Err(
+                    io::Error::new(io::ErrorKind::PermissionDenied, "disallowed login").into(),
+                )
+            }
             _ => password,
         };
 
         if !pwhash::unix::verify(
-            &password_from_tty!("[{}] Password: ", user.name)?,
+            &password_from_tty!("[{}] Password: ", SERVICE_NAME)?,
             &password[..],
         ) {
-            io_bail!(PermissionDenied, "Authentication failed");
+            return Err(
+                io::Error::new(io::ErrorKind::PermissionDenied, "permission denied").into(),
+            );
         }
 
         self.users.insert(user.uid, Instant::now());

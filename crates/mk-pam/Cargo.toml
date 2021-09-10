@@ -12,6 +12,7 @@ authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 lazy_static = "1.4"
 thiserror = "1.0"
 num_enum = "0.5"
+bitflags = "1.3"
 
 mk-common = { path = "../mk-common" }
 

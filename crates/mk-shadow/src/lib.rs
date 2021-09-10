@@ -11,12 +11,9 @@ use std::time;
 
 use mk_common::*;
 
-pub type Uid = libc::uid_t;
-pub type Gid = libc::gid_t;
-
 /// Shadow routines are not thread safe. This is a safe guard against thread races.
 /// See <https://www.man7.org/linux/man-pages/man3/getspnam.3.html#ATTRIBUTES>.
-static SPNAME_LOCK: GlobalFunctionLock = GlobalFunctionLock::new(false);
+static SPNAME_LOCK: ResourceLock = ResourceLock::new(false);
 
 /// A single entry in the shadow file.
 #[derive(Debug, Clone)]
@@ -27,20 +24,12 @@ pub struct Spwd {
     pub password: String,
     /// Date of last password change.
     pub date_change: Option<std::time::SystemTime>,
-    /// Minimum password age.
-    ///
     /// The duration that must pass before the user's password can be changed.
     pub password_age_min: Option<time::Duration>,
-    /// Maximum password age.
-    ///
     /// The duration after which the user's password must be changed.
     pub password_age_max: Option<time::Duration>,
-    /// Warning period.
-    ///
     /// The duration before password expiry, in which the user will be warned to change their password.
     pub password_warn_duration: Option<time::Duration>,
-    /// Inactive period.
-    ///
     /// The duration after password expiry, after which the user's account will be disabled.
     pub password_inactive_duration: Option<time::Duration>,
     /// Date when the user's account expired.
@@ -51,10 +40,6 @@ pub struct Spwd {
 
 impl Spwd {
     /// Get a [`Spwd`] struct from a raw [`libc::spwd`] pointer.
-    ///
-    /// # Errors
-    ///
-    /// - [`io::Error`] of kind [`io::ErrorKind::InvalidData`] - when the pointer is null.
     ///
     /// # Safety
     ///
@@ -109,14 +94,16 @@ impl Spwd {
         // other error occurs during processing. We handle this with an early exit. Thread races
         // are checked using the global `SPNAME_LOCK`.
         unsafe {
-            let ptr = function_lock!(
-                SPNAME_LOCK,
-                libc::getspnam(CString::new(name)?.as_ptr()),
-                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
+            let cname = CString::new(name)?;
+
+            let ptr = fn_lock(
+                &SPNAME_LOCK,
+                || libc::getspnam(cname.as_ptr()),
+                || io::Error::new(io::ErrorKind::Interrupted, "thread locked"),
             )?;
 
             if ptr.is_null() {
-                io_bail!(InvalidData, "null pointer");
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer"));
             }
 
             Self::from_raw(ptr)
@@ -129,21 +116,6 @@ impl Spwd {
     ///
     /// - [`io::Error`] if a user was not found or if an error occurred while processing.
     pub fn from_passwd(pwd: &mk_pwd::Passwd) -> io::Result<Self> {
-        // SAFETY: shadow routines return a null pointer if an entry is not available, or if some
-        // other error occurs during processing. We handle this with an early exit. Thread races
-        // are checked using the global `SPNAME_LOCK`.
-        unsafe {
-            let ptr = function_lock!(
-                SPNAME_LOCK,
-                libc::getspnam(CString::new(&pwd.name[..])?.as_ptr()),
-                io::Error::new(io::ErrorKind::Interrupted, "thread locked")
-            )?;
-
-            if ptr.is_null() {
-                io_bail!(InvalidData, "null pointer");
-            }
-
-            Self::from_raw(ptr)
-        }
+        Self::from_name(&pwd.name[..])
     }
 }

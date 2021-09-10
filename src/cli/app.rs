@@ -1,4 +1,4 @@
-//! The `mk` app.
+//! This holds everything together.
 
 use std::cell::Cell;
 use std::os::unix::process::CommandExt;
@@ -20,9 +20,9 @@ impl App {
             _config,
             // TODO: this will be parsed from `_config` later on.
             #[cfg(feature = "pam")]
-            authenticator: auth::new(auth::Supported::Pam)?,
+            authenticator: auth::new(&auth::Supported::Pam)?,
             #[cfg(not(feature = "pam"))]
-            authenticator: auth::new(auth::Supported::Pwd)?,
+            authenticator: auth::new(&auth::Supported::Pwd)?,
         })
     }
 
@@ -38,10 +38,7 @@ impl App {
         match options {
             MkOptions::Command(cmd) => return self.exec(cmd),
             MkOptions::Text(help) => {
-                println!("{}", help);
-            }
-            MkOptions::Error(help) => {
-                eprintln!("{}", help);
+                println!("{}", help)
             }
             _ => {}
         }
@@ -55,10 +52,13 @@ impl App {
         // check if `origin` is allowed to execute as `target` from the config.
 
         let exit = Cell::new(None);
-        let origin = options.origin()?;
 
         let session = Box::new(|| -> MkResult<()> {
-            let mut command = Command::new(options.command);
+            let mut command = Command::new(&options.command[..]);
+
+            // Set ids
+            command.uid(options.target.uid);
+            command.gid(options.target.gid);
 
             // Set arguments
             command.args(options.args);
@@ -70,10 +70,6 @@ impl App {
                 command.envs(vars);
             }
 
-            // Set ids
-            command.uid(options.target.uid);
-            command.gid(options.target.gid);
-
             // Wait on child
             if let Some(c) = command.spawn()?.wait()?.code() {
                 let _ = &exit.set(Some(c));
@@ -82,7 +78,8 @@ impl App {
             Ok(())
         });
 
-        self.authenticator.session(&origin, session)?;
+        self.authenticator
+            .session(&mk_pwd::Passwd::from_uid(util::get_uid())?, session)?;
         Ok(exit.into_inner())
     }
 }

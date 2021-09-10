@@ -9,7 +9,7 @@ pub enum MkError {
     /// PAM error.
     #[error("{0}")]
     #[cfg(feature = "pam")]
-    Pam(mk_pam::RawError),
+    Pam(#[from] mk_pam::RawError),
 
     /// IO Error.
     #[error("{0}")]
