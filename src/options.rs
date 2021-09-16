@@ -12,7 +12,7 @@ pub struct CommandOptions {
     /// Arguments to pass to the command.
     pub args: Vec<String>,
     /// Environment variable mappings.
-    pub preserve_env: bool,
+    pub preserve_env: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,8 +25,8 @@ pub struct EditOptions {
 
 /// All runtime options for `mk`.
 #[non_exhaustive]
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum MkOptions {
     None,
     Command(CommandOptions),

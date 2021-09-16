@@ -10,5 +10,6 @@ pub mod config;
 pub mod errors;
 pub mod options;
 pub mod prelude;
+pub mod session;
 
 pub use errors::*;

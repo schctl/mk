@@ -1,16 +1,13 @@
 //! User authentication using PAM.
 
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
-
 use mk_pam as pam;
-use mk_pwd::Uid;
 
-use super::Authenticator;
+use super::config::Rules;
+use super::UserAuthenticator;
 use crate::prelude::*;
 
 /// Prompt a string.
-fn pam_prompt(msg: &str) -> Result<pam::Response, pam::RawError> {
+fn pam_prompt(msg: &str) -> core::result::Result<pam::Response, pam::RawError> {
     Ok(pam::Response {
         resp: {
             if msg.to_lowercase().contains("password") {
@@ -30,7 +27,9 @@ fn pam_prompt(msg: &str) -> Result<pam::Response, pam::RawError> {
 }
 
 /// Exported PAM conversation function.
-fn pam_conversation(messages: &mut [pam::conv::MessageContainer]) -> Result<(), pam::RawError> {
+fn pam_conversation(
+    messages: &mut [pam::conv::MessageContainer],
+) -> core::result::Result<(), pam::RawError> {
     for msg in messages {
         let resp = match msg.get().kind() {
             pam::MessageType::PromptEcho | pam::MessageType::Prompt => {
@@ -55,77 +54,55 @@ fn pam_conversation(messages: &mut [pam::conv::MessageContainer]) -> Result<(), 
 
 /// PAM authentication structure. Holds all data required to begin a session with PAM.
 pub struct PamAuthenticator {
-    /// List of all authenticated users and when they were authenticated.
-    users: HashMap<Uid, Instant>,
-}
-
-unsafe impl Send for PamAuthenticator {}
-unsafe impl Sync for PamAuthenticator {}
-
-impl Default for PamAuthenticator {
-    fn default() -> Self {
-        Self::new()
-    }
+    user: mk_pwd::Passwd,
+    handle: pam::Handle,
+    #[allow(unused)]
+    rules: Rules,
 }
 
 impl PamAuthenticator {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            users: HashMap::new(),
-        }
-    }
+    pub fn new(user: mk_pwd::Passwd, rules: Rules) -> Result<Self> {
+        let handle = {
+            // Create conversation function
+            let conv = pam::conv::Conversation {
+                conv: Box::new(pam_conversation),
+            };
 
-    /// Start a PAM context and return its corresponding handle.
-    fn create_context(&mut self, user: &mk_pwd::Passwd) -> MkResult<pam::Handle> {
-        // Check if user is in the list of authenticated users.
-        if let Some(u) = self.users.get(&user.uid) {
-            if Instant::now() - *u > Duration::from_secs(600) {
-                self.users.remove(&user.uid);
-            }
-        }
+            let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], conv)?;
 
-        // Create conversation function
-        let conv = pam::conv::Conversation {
-            conv: Box::new(pam_conversation),
-        };
-
-        let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], conv)?;
-
-        // Set requesting user.
-        if let Err(e) = handle.set_item(pam::Item::RequestUser(user.name.clone())) {
-            return Err(e.into());
-        }
-
-        // Authenticate user.
-        if let Err(e) = handle.authenticate(None) {
-            return Err(e.into());
-        }
-
-        // Get new token if required.
-        if let Err(pam::PamError::Raw(pam::RawError::NewAuthTokenRequired)) = handle.validate(None)
-        {
-            if let Err(e) = handle.change_auth_token(None) {
+            // Set requesting user.
+            if let Err(e) = handle.set_item(pam::Item::RequestUser(user.name.clone())) {
                 return Err(e.into());
             }
-        }
 
-        Ok(handle)
+            // TODO: host name
+
+            handle
+        };
+
+        Ok(Self {
+            user,
+            handle,
+            rules,
+        })
     }
 }
 
-impl Authenticator for PamAuthenticator {
-    fn session<'a>(
-        &mut self,
-        user: &mk_pwd::Passwd,
-        session: Box<dyn FnOnce() -> MkResult<()> + 'a>,
-    ) -> MkResult<()> {
-        let handle = self.create_context(user)?;
+impl UserAuthenticator for PamAuthenticator {
+    fn get_user(&self) -> &mk_pwd::Passwd {
+        &self.user
+    }
 
-        handle.open_session(None)?;
-        session()?;
-        handle.close_session(None)?;
-
+    fn validate(&self) -> Result<()> {
+        self.handle.authenticate(None)?;
+        self.handle.validate(None)?;
         Ok(())
+    }
+
+    fn session<'a>(&self, session: Box<dyn FnOnce() -> Result<()> + 'a>) -> Result<Result<()>> {
+        self.handle.open_session(None)?;
+        let res = session();
+        self.handle.close_session(None)?;
+        Ok(res)
     }
 }

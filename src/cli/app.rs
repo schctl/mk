@@ -1,29 +1,36 @@
 //! This holds everything together.
 
 use std::cell::Cell;
+use std::io;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
-use crate::auth::{self, Authenticator};
+use mk_common::get_uid;
+
+use crate::auth;
 use crate::config::Config;
 use crate::options::*;
 use crate::prelude::*;
+use crate::session::{config::SessionConfig, UserSession};
 
 pub struct App {
-    _config: Config,
-    authenticator: Box<dyn Authenticator>,
+    session: UserSession,
 }
 
 impl App {
-    pub fn new(_config: Config) -> MkResult<Self> {
-        Ok(Self {
-            _config,
-            // TODO: this will be parsed from `_config` later on.
-            #[cfg(feature = "pam")]
-            authenticator: auth::new(&auth::Supported::Pam)?,
-            #[cfg(not(feature = "pam"))]
-            authenticator: auth::new(&auth::Supported::Pwd)?,
-        })
+    pub fn new(cfg: Config) -> Result<Self> {
+        let user = mk_pwd::Passwd::from_uid(get_uid())?;
+
+        if let Some(c) = cfg.session.get(&user.name) {
+            Ok(Self {
+                session: UserSession::recover_or_new(SessionConfig {
+                    auth: auth::new(user, cfg.authenticator)?,
+                    rules: c.clone(),
+                })?,
+            })
+        } else {
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "no found session").into())
+        }
     }
 
     /// Run the appropriate method for given options.
@@ -31,15 +38,10 @@ impl App {
     /// # Returns
     ///
     /// Exit status of the process run (if any).
-    pub fn run(&mut self, options: MkOptions) -> MkResult<Option<i32>> {
-        // clippy complains here despite `MkOptions` being `non_exhaustive`.
-
-        #[allow(unreachable_patterns)]
+    pub fn run(&mut self, options: MkOptions) -> Result<Option<i32>> {
         match options {
             MkOptions::Command(cmd) => return self.exec(cmd),
-            MkOptions::Text(help) => {
-                println!("{}", help)
-            }
+            MkOptions::Text(help) => println!("{}", help),
             _ => {}
         }
 
@@ -47,20 +49,21 @@ impl App {
     }
 
     /// Execute a command with the given `options`.
-    pub fn exec(&mut self, options: CommandOptions) -> MkResult<Option<i32>> {
-        // TODO:
-        // check if `origin` is allowed to execute as `target` from the config.
+    ///
+    /// # Returns
+    ///
+    /// Exit status of the process run (if any).
+    pub fn exec(&mut self, options: CommandOptions) -> Result<Option<i32>> {
+        let target = &options.target;
 
         let exit = Cell::new(None);
 
-        let session = Box::new(|| -> MkResult<()> {
+        let session: Box<dyn FnOnce() -> Result<()>> = Box::new(|| -> Result<()> {
             let mut command = Command::new(&options.command[..]);
 
-            // Set ids
             command.uid(options.target.uid);
             command.gid(options.target.gid);
 
-            // Set arguments
             command.args(options.args);
 
             // TODO: env preservation
@@ -73,8 +76,11 @@ impl App {
             Ok(())
         });
 
-        self.authenticator
-            .session(&mk_pwd::Passwd::from_uid(util::get_uid())?, session)?;
+        self.session.run(target, session)??;
+
+        // we'll probably log this later
+        let _ = self.session.store_to_file();
+
         Ok(exit.into_inner())
     }
 }

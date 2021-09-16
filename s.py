@@ -14,12 +14,10 @@ TMP = 'target/supported'
 
 # Feature requirements
 FEATURES = {
-    # --- Top level requirements ---
     '': {
         'headers': ['pwd'],
         'dylibs': []
     },
-    # ------------------------------
     'shadow': {
         'headers': ['shadow'],
         'dylibs': []
@@ -40,7 +38,6 @@ def test_cc(name: str, src: str, links) -> str:
     if os.path.exists(out):
         return out
 
-    # Write source file
     with open(path, 'w') as f:
         f.write(src)
 
@@ -96,7 +93,6 @@ int main(int argc, char** argv) {'{'}
 
 
 def main():
-    # Create temporary dir
     if not os.path.exists(TMP):
         os.makedirs(TMP)
 
@@ -104,8 +100,7 @@ def main():
 
     for f in FEATURES:
         if maybe_feature(f):
-            if f != '':
-                flist.append(f)
+            flist.append(f)
         else:
             if f == '':
                 sys.exit(-1)

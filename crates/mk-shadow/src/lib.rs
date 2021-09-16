@@ -16,7 +16,7 @@ use mk_common::*;
 static SPNAME_LOCK: ResourceLock = ResourceLock::new(false);
 
 /// A single entry in the shadow file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spwd {
     /// User's login name.
     pub name: String,

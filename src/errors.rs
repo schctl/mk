@@ -5,7 +5,7 @@ use thiserror::Error as ThisError;
 
 /// All error types that we handle.
 #[derive(ThisError, Debug)]
-pub enum MkError {
+pub enum Error {
     /// PAM error.
     #[error("{0}")]
     #[cfg(feature = "pam")]
@@ -17,7 +17,7 @@ pub enum MkError {
 }
 
 #[cfg(feature = "pam")]
-impl From<mk_pam::PamError> for MkError {
+impl From<mk_pam::PamError> for Error {
     fn from(e: mk_pam::PamError) -> Self {
         match e {
             mk_pam::PamError::Raw(r) => Self::Pam(r),

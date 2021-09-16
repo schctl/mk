@@ -10,6 +10,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// A lock to indicate that it is not safe to use a resource now.
 pub type ResourceLock = AtomicBool;
 
+pub type Uid = libc::uid_t;
+pub type Gid = libc::gid_t;
+pub type Pid = libc::pid_t;
+
 /// Helper function to wrap an execution within a global function lock.
 ///
 /// This is a commonly used pattern throughout the `mk` crates to wrap ffi functions that are
@@ -49,16 +53,20 @@ pub unsafe fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Get the real user ID of the calling process.
+#[must_use]
+pub fn get_uid() -> Uid {
+    unsafe { libc::getuid() }
+}
 
-    #[test]
-    fn test_cstr_to_string() {
-        let cstr = ::std::ffi::CString::new("test\x123").unwrap();
-        assert_eq!(
-            &unsafe { cstr_to_string(cstr.as_ptr() as *mut c_char).unwrap() }[..],
-            "test\x123"
-        )
-    }
+/// Get the effective user ID of the calling process.
+#[must_use]
+pub fn get_euid() -> Uid {
+    unsafe { libc::geteuid() }
+}
+
+// Get the PID of the parent process.
+#[must_use]
+pub fn get_parent_pid() -> Pid {
+    unsafe { libc::getppid() }
 }

@@ -1,9 +1,9 @@
 //! Useful re-exports.
 
-pub use crate::errors::MkError;
+pub use crate::errors::Error;
 pub use crate::util;
 
-pub type MkResult<T> = Result<T, MkError>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 pub const VERSION: &str = "0.0.1";
 pub const SERVICE_NAME: &str = "mk";

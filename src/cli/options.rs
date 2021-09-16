@@ -9,7 +9,7 @@ use crate::options::*;
 use crate::prelude::*;
 
 /// Parse runtime options from the command line using [`clap`].
-pub fn from_terminal<I, T>(iter: I) -> MkResult<MkOptions>
+pub fn from_terminal<I, T>(iter: I) -> Result<MkOptions>
 where
     I: IntoIterator<Item = T>,
     T: Into<String> + Clone,
@@ -31,12 +31,14 @@ where
             Arg::new("preserve-env")
                 .short('E')
                 .long("preserve-env")
+                .takes_value(true)
                 .about("Preserve existing environment variables"),
         )
         .arg(
             Arg::new("edit")
                 .short('e')
                 .long("edit")
+                .takes_value(true)
                 .about("Edit a file as the target user"),
         );
 
@@ -82,7 +84,9 @@ where
             target,
             command: ext_cmd.to_string(),
             args,
-            preserve_env: matches.is_present("preserve-env"),
+            preserve_env: matches
+                .value_of("preserve-env")
+                .map(|s| s.split(',').map(|s| s.to_owned()).collect()),
         }));
     }
 

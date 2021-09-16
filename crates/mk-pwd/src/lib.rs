@@ -7,9 +7,6 @@ use std::io;
 
 use mk_common::*;
 
-pub type Uid = libc::uid_t;
-pub type Gid = libc::gid_t;
-
 /// `getpwnam` is not thread safe. This is a safe guard against thread races.
 /// See <https://man7.org/linux/man-pages/man3/getpwnam.3p.html#DESCRIPTION>.
 static PWNAME_LOCK: ResourceLock = ResourceLock::new(false);
@@ -17,7 +14,7 @@ static PWNAME_LOCK: ResourceLock = ResourceLock::new(false);
 /// A single entry in the password database.
 ///
 /// See [`passwd(5)`](https://man7.org/linux/man-pages/man5/passwd.5.html) for more.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Passwd {
     /// User's login name.
     pub name: String,

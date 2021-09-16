@@ -1,64 +1,56 @@
 //! User authentication agents.
 
 use std::io;
-use std::time;
 
+pub mod config;
 #[cfg(feature = "pam")]
 pub mod pam;
 pub mod pwd;
 
 use crate::prelude::*;
 
-/// Provides methods to authenticate a user.
-///
-/// Additional required information must be held by the implementer. The intention is for an
-/// Authenticator to be dumped to a file and recovered between sessions.
-pub trait Authenticator: Send + Sync {
+/// A user authentication agent.
+pub trait UserAuthenticator {
+    /// Get the user this authenticator is associated with.
+    fn get_user(&self) -> &mk_pwd::Passwd;
+
+    /// Authenticate the user and check if the user's account is valid.
+    ///
+    /// # Errors
+    ///
+    /// This function fails if the user could not be validated.
+    fn validate(&self) -> Result<()>;
+
     /// Run a function in an authenticated session.
-    fn session<'a>(
-        &mut self,
-        user: &mk_pwd::Passwd,
-        session: Box<dyn FnOnce() -> MkResult<()> + 'a>,
-    ) -> MkResult<()>;
-
-    /// Set authentication timeout. This will fail any authentication attempts after waiting
-    /// for the provided duration.
-    fn set_timeout(&mut self, _: Option<time::Duration>) -> MkResult<()> {
-        Ok(())
-    }
-
-    /// Get the authentication timeout.
-    fn get_timeout(&self) -> &Option<time::Duration> {
-        &None
-    }
+    ///
+    /// This doesn't assume anything about the validity of the user's account.
+    ///
+    /// # Returns
+    ///
+    /// If successful, the function returns an [`Ok`] containing the result of the function.
+    ///
+    /// # Errors
+    ///
+    /// This function fails if the underlying service was unable to start or close a session.
+    fn session<'a>(&self, session: Box<dyn FnOnce() -> Result<()> + 'a>) -> Result<Result<()>>;
 }
 
-/// All supported authenticator types.
-#[allow(unused)]
-#[non_exhaustive]
-#[derive(Debug)]
-pub enum Supported {
-    /// [`pam::PamAuthenticator`] authentication.
-    #[cfg(feature = "pam")]
-    Pam,
-    /// [`pwd::PwdAuthenticator`] authentication.
-    Pwd,
-}
-
-/// Create a new authenticator from the supported types.
+/// Create a new authenticator from the given configuration.
 ///
-/// This returns an [`std::io::Error`] of kind [`std::io::ErrorKind::NotFound`] if the feature for the given type of authenticator
-/// has not been specified.
+/// This returns an [`std::io::Error`] of kind [`std::io::ErrorKind::NotFound`] if the feature for the
+/// given type of authenticator has not been specified.
 #[allow(unreachable_patterns)]
-pub fn new(_type: &Supported) -> MkResult<Box<dyn Authenticator>> {
-    match _type {
+pub fn new(user: mk_pwd::Passwd, cfg: config::AuthConfig) -> Result<Box<dyn UserAuthenticator>> {
+    Ok(match cfg.ty {
         #[cfg(feature = "pam")]
-        Supported::Pam => Ok(Box::new(pam::PamAuthenticator::new())),
-        Supported::Pwd => Ok(Box::new(pwd::PwdAuthenticator::new())),
-        _ => Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("unsupported authenticator {:?}", _type),
-        )
-        .into()),
-    }
+        config::AuthService::Pam => Box::new(pam::PamAuthenticator::new(user, cfg.rules)?),
+        config::AuthService::Pwd => Box::new(pwd::PwdAuthenticator::new(user, cfg.rules)?),
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("unsupported authenticator {:?}", cfg.ty),
+            )
+            .into())
+        }
+    })
 }

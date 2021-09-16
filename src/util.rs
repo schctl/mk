@@ -2,20 +2,10 @@
 
 #![allow(unused_macros)]
 
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader};
-
-use mk_pwd::Uid;
-
-/// Get the real user ID of the calling process.
-pub fn get_uid() -> Uid {
-    unsafe { libc::getuid() }
-}
-
-/// Get the effective user ID of the calling process.
-pub fn get_euid() -> Uid {
-    unsafe { libc::geteuid() }
-}
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 
 /// Get the `PATH` variable from the environment.
 ///
@@ -26,6 +16,14 @@ pub fn get_path() -> String {
         String::from("/usr/local/sbin:/usr/local/bin:/usr/bin"),
         |p| p.1,
     )
+}
+
+/// Change a given file's mode.
+pub fn set_mode<P: AsRef<Path>>(path: P, mode: u32) -> io::Result<()> {
+    let mut perms = fs::metadata(path.as_ref())?.permissions();
+    perms.set_mode(mode);
+    fs::set_permissions(path, perms)?;
+    Ok(())
 }
 
 /// Read a line from `/dev/tty`.
