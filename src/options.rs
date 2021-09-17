@@ -2,11 +2,13 @@
 
 use std::path::PathBuf;
 
+use mk_pwd::Passwd;
+
 /// Run a command as another user.
 #[derive(Debug, Clone)]
 pub struct CommandOptions {
     /// Requested user to run the command as.
-    pub target: mk_pwd::Passwd,
+    pub target: Passwd,
     /// Command to run.
     pub command: String,
     /// Arguments to pass to the command.
@@ -18,7 +20,7 @@ pub struct CommandOptions {
 #[derive(Debug, Clone)]
 pub struct EditOptions {
     /// Requested user to edit the file as.
-    pub target: mk_pwd::Passwd,
+    pub target: Passwd,
     /// Path of file to edit.
     pub path: PathBuf,
 }

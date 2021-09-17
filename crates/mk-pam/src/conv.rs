@@ -25,12 +25,12 @@ lazy_static! {
 /// Contains the PAM conversation function. This will be called by a loaded PAM module.
 pub struct Conversation {
     /// Unlike the regular PAM conversation function, this is called for every message provided.
-    pub conv: Box<dyn Fn(&mut [MessageContainer]) -> Result<(), RawError>>,
+    pub conv: Box<dyn Fn(&mut [MessageContainer]) -> core::result::Result<(), PamError>>,
 }
 
 impl std::fmt::Debug for Conversation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PAM conversation function")
+        f.write_str("PAM conversation function")
     }
 }
 
@@ -39,9 +39,10 @@ unsafe impl Sync for Conversation {}
 
 /// Structure used in a PAM conversation, containing the message sent from a module,
 /// and its corresponding response, if any.
+#[readonly::make]
 #[derive(Debug)]
 pub struct MessageContainer {
-    msg: Message,
+    pub msg: Message,
     resp: Option<Response>,
 }
 
@@ -51,22 +52,20 @@ impl MessageContainer {
         Self { msg, resp: None }
     }
 
-    /// Get the internal PAM message.
-    pub fn get(&self) -> &Message {
-        &self.msg
-    }
-
     /// Get the currently set response to the internal message.
+    #[inline]
     pub fn get_response(&self) -> &Option<Response> {
         &self.resp
     }
 
     /// Set a new response to the internal message.
+    #[inline]
     pub fn set_response(&mut self, resp: Option<Response>) {
         self.resp = resp;
     }
 
     /// Return internal message and response.
+    #[inline]
     pub fn into_raw_parts(self) -> (Message, Option<Response>) {
         (self.msg, self.resp)
     }
@@ -108,7 +107,7 @@ pub(crate) extern "C" fn __raw_pam_conv(
             messages.push(MessageContainer::new(
                 match unsafe { (*raw_msgs).offset(i) }.try_into() {
                     Ok(m) => m,
-                    Err(_) => return RawError::Conversation.into(),
+                    Err(_) => return PamError::Conversation.into(),
                 },
             ));
         }
@@ -125,7 +124,7 @@ pub(crate) extern "C" fn __raw_pam_conv(
             responses.push(match m.into_raw_parts().1 {
                 Some(m) => match ffi::pam_response::try_from(m) {
                     Ok(r) => r,
-                    Err(_) => return RawError::Conversation.into(),
+                    Err(_) => return PamError::Conversation.into(),
                 },
                 None => unsafe { std::mem::zeroed() },
             })

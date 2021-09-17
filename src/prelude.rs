@@ -1,7 +1,7 @@
 //! Useful re-exports.
 
 pub use crate::errors::Error;
-pub use crate::util;
+pub use crate::utils;
 
 pub type Result<T> = core::result::Result<T, Error>;
 

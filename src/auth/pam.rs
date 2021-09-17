@@ -2,23 +2,22 @@
 
 use mk_pam as pam;
 
-use super::config::Rules;
-use super::UserAuthenticator;
+use super::{Rules, UserAuthenticator};
 use crate::prelude::*;
 
 /// Prompt a string.
-fn pam_prompt(msg: &str) -> core::result::Result<pam::Response, pam::RawError> {
+fn pam_prompt(msg: &str) -> core::result::Result<pam::Response, pam::PamError> {
     Ok(pam::Response {
         resp: {
             if msg.to_lowercase().contains("password") {
                 match password_from_tty!("[{}] {}", SERVICE_NAME, msg) {
                     Ok(p) => p,
-                    Err(_) => return Err(pam::RawError::Conversation),
+                    Err(_) => return Err(pam::PamError::Conversation),
                 }
             } else {
                 match prompt_from_tty!("[{}] {}", SERVICE_NAME, msg) {
                     Ok(s) => s,
-                    Err(_) => return Err(pam::RawError::Conversation),
+                    Err(_) => return Err(pam::PamError::Conversation),
                 }
             }
         },
@@ -29,18 +28,18 @@ fn pam_prompt(msg: &str) -> core::result::Result<pam::Response, pam::RawError> {
 /// Exported PAM conversation function.
 fn pam_conversation(
     messages: &mut [pam::conv::MessageContainer],
-) -> core::result::Result<(), pam::RawError> {
+) -> core::result::Result<(), pam::PamError> {
     for msg in messages {
-        let resp = match msg.get().kind() {
+        let resp = match msg.msg.kind {
             pam::MessageType::PromptEcho | pam::MessageType::Prompt => {
-                Some(pam_prompt(&msg.get().get()[..])?)
+                Some(pam_prompt(&msg.msg.contents[..])?)
             }
             pam::MessageType::ShowText => {
-                println!("[{}] {}", SERVICE_NAME, msg.get().get());
+                println!("[{}] {}", SERVICE_NAME, msg.msg.contents);
                 None
             }
             pam::MessageType::ShowError => {
-                eprintln!("[{}] {}", SERVICE_NAME, msg.get().get());
+                eprintln!("[{}] {}", SERVICE_NAME, msg.msg.contents);
                 None
             }
             _ => None,

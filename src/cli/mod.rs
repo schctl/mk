@@ -2,11 +2,13 @@
 
 use std::process::exit;
 
+use crate::config::Config;
+use crate::prelude::*;
+
 mod app;
 mod options;
 
-use crate::config::Config;
-use crate::prelude::*;
+pub use app::App;
 
 fn exit_with_err(err: Error) -> ! {
     eprintln!("{}: {}", SERVICE_NAME, err);
@@ -28,7 +30,7 @@ where
         Ok(i) => i,
     };
 
-    let mut app = match app::App::new(conf) {
+    let mut app = match App::new(conf) {
         Err(e) => exit_with_err(e),
         Ok(i) => i,
     };

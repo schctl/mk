@@ -1,16 +1,18 @@
 //! Authenticated session tools.
 
-use std::fs;
 use std::io;
-use std::path::PathBuf;
 use std::time::SystemTime;
 
-use mk_common::*;
+use mk_pwd::Passwd;
 
+use crate::auth::UserAuthenticator;
 use crate::prelude::*;
-use crate::util::set_mode;
 
-pub mod config;
+mod rules;
+mod state;
+
+pub use rules::*;
+pub use state::*;
 
 /// Represents a recoverable authenticated user session.
 ///
@@ -18,63 +20,32 @@ pub mod config;
 /// in an authenticated session.
 pub struct UserSession {
     /// Current state of the session.
-    state: config::State,
+    state: State,
+    /// Authentication service to use.
+    auth: Box<dyn UserAuthenticator>,
     /// Pre-defined session rules.
-    cfg: config::SessionConfig,
+    rules: Rules,
 }
 
 impl UserSession {
-    /// Session storage directory.
-    pub const STORAGE_DIR: &'static str = "/var/run/mk/sess";
-
-    /// Private constructor.
-    fn __new(state: config::State, cfg: config::SessionConfig) -> Result<Self> {
-        Ok(Self { state, cfg })
-    }
-
     /// Create a new session for this user.
-    pub fn new(cfg: config::SessionConfig) -> Result<Self> {
-        Self::__new(config::State::new(), cfg)
+    pub fn new(auth: Box<dyn UserAuthenticator>, rules: Rules) -> Self {
+        Self::with_state(auth, rules, State::new())
     }
 
-    /// Try to recover a session from its stored state a file. If a session could not be found,
-    /// create a new one.
-    pub fn recover_or_new(cfg: config::SessionConfig) -> Result<Self> {
-        let mut path = PathBuf::new();
-
-        path.push(Self::STORAGE_DIR);
-        path.push(format!("{}-{}", cfg.auth.get_user().name, get_parent_pid()));
-
-        if !path.exists() {
-            return Self::new(cfg);
-        }
-
-        let mut f = fs::File::open(path)?;
-        let state = config::State::try_recover(&mut f)?;
-        Self::__new(state, cfg)
+    /// Create a new session from existing state.
+    pub fn with_state(auth: Box<dyn UserAuthenticator>, rules: Rules, state: State) -> Self {
+        Self { state, auth, rules }
     }
 
-    /// Try to store this session's state into a file.
-    pub fn store_to_file(&self) -> Result<()> {
-        let mut path = PathBuf::new();
-        path.push(Self::STORAGE_DIR);
+    /// Get the current state of this session.
+    pub fn get_state(&self) -> &State {
+        &self.state
+    }
 
-        if !path.exists() {
-            fs::create_dir_all(&path)?;
-        }
-        util::set_mode(&path, 0o600)?;
-
-        path.push(format!(
-            "{}-{}",
-            self.cfg.auth.get_user().name,
-            get_parent_pid()
-        ));
-
-        let mut f = fs::File::create(&path)?;
-        self.state.try_dump(&mut f)?;
-
-        set_mode(&path, 0o600)?;
-        Ok(())
+    /// Get the user this session is associated with.
+    pub fn get_user(&self) -> &Passwd {
+        self.auth.get_user()
     }
 
     /// Validate a user's account and run a function in an authenticated session.
@@ -93,8 +64,9 @@ impl UserSession {
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
     ) -> Result<Result<()>> {
         // ᕙ(⇀‸↼‵‵)ᕗ
-        if !(self.cfg.auth.get_user() == target
-            || self.cfg.rules.get_permitted().contains(&target.name))
+        if !(self.auth.get_user() == target
+            || self.rules.permitted.contains(&target.name)
+            || self.rules.all_targets)
         {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -104,21 +76,25 @@ impl UserSession {
         }
 
         // Check if the user needs to be re-validated
-        if !self.cfg.rules.get_no_auth() {
-            // Don't worry about the session lifetime if no_auth is allowed.
-            if let Some(s) = self.state.last_active {
+        if !self.rules.no_auth {
+            let mut need_auth = true;
+
+            // Check if the session has exceeded its timeout
+            if let Some(s) = self.state.last_used {
                 if let Ok(dur) = SystemTime::now().duration_since(s) {
-                    if dur > self.cfg.rules.get_timeout() {
-                        self.cfg.auth.validate()?;
+                    if let Some(t) = self.rules.get_timeout() {
+                        need_auth = dur > t;
                     }
                 }
-            } else {
-                self.cfg.auth.validate()?;
+            };
+
+            if need_auth {
+                self.auth.validate()?;
             }
 
-            self.state.last_active = Some(SystemTime::now());
+            self.state.last_used = Some(SystemTime::now());
         }
 
-        self.cfg.auth.session(session)
+        self.auth.session(session)
     }
 }

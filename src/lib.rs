@@ -2,7 +2,7 @@
 //! [`doas`](https://github.com/Duncaen/OpenDoas) or [`sudo`](https://github.com/sudo-project/sudo).
 
 #[macro_use]
-pub mod util;
+pub mod utils;
 
 pub mod auth;
 pub mod cli;

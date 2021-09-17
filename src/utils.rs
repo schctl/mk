@@ -1,16 +1,26 @@
 //! Random utility functions.
 
-#![allow(unused_macros)]
-
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::time::Duration;
+
+/// Interpret an integer as a [`Duration`]. Intended for serialization in configurations.
+#[inline]
+pub fn duration_from_minutes(val: i64) -> Option<Duration> {
+    if val < 0 {
+        None
+    } else {
+        Some(Duration::from_secs(val as u64 * 60))
+    }
+}
 
 /// Get the `PATH` variable from the environment.
 ///
 /// Returns a fallback string if it is not available.
 #[must_use]
+#[inline]
 pub fn get_path() -> String {
     std::env::vars().find(|p| p.0 == "PATH").map_or(
         String::from("/usr/local/sbin:/usr/local/bin:/usr/bin"),
@@ -47,7 +57,7 @@ macro_rules! prompt_from_tty {
     ($($arg:tt)*) => {
         {
             print!($($arg)*);
-            $crate::util::readln_from_tty()
+            $crate::utils::readln_from_tty()
         }
     };
 }

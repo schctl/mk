@@ -55,18 +55,21 @@ pub unsafe fn cstr_to_string(ptr: *mut c_char) -> io::Result<String> {
 
 /// Get the real user ID of the calling process.
 #[must_use]
+#[inline]
 pub fn get_uid() -> Uid {
     unsafe { libc::getuid() }
 }
 
 /// Get the effective user ID of the calling process.
 #[must_use]
+#[inline]
 pub fn get_euid() -> Uid {
     unsafe { libc::geteuid() }
 }
 
 // Get the PID of the parent process.
 #[must_use]
+#[inline]
 pub fn get_parent_pid() -> Pid {
     unsafe { libc::getppid() }
 }

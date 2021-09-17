@@ -122,47 +122,38 @@ pub enum MessageType {
 }
 
 /// A PAM message.
+#[readonly::make]
 #[derive(Debug)]
 pub struct Message {
     /// The actual message.
-    msg: String,
+    pub contents: String,
     /// The type of message.
-    kind: MessageType,
+    pub kind: MessageType,
 }
 
 impl Message {
     /// Create a new PAM message.
     #[must_use]
-    pub fn new(msg: String, kind: MessageType) -> Self {
-        Self { msg, kind }
-    }
-
-    /// Get the actual message contained.
-    pub fn get(&self) -> &String {
-        &self.msg
-    }
-
-    /// Get the type of message contained.
-    pub fn kind(&self) -> MessageType {
-        self.kind
+    pub fn new(contents: String, kind: MessageType) -> Self {
+        Self { contents, kind }
     }
 }
 
 impl TryFrom<*const ffi::pam_message> for Message {
-    type Error = PamError;
+    type Error = Error;
 
     /// Convert a raw *[`ffi::pam_message`] to a [`Message`]. Returns the
     /// message contents as a [`String`] if it is of an unknown type.
-    fn try_from(value: *const ffi::pam_message) -> Result<Self, Self::Error> {
+    fn try_from(value: *const ffi::pam_message) -> Result<Self> {
         if value.is_null() {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer").into());
         }
 
         let value = unsafe { *value };
-        let msg = unsafe { mk_common::cstr_to_string(value.msg as *mut c_char)? };
+        let contents = unsafe { mk_common::cstr_to_string(value.msg as *mut c_char)? };
 
         Ok(Self {
-            msg,
+            contents,
             kind: match value.msg_style.try_into() {
                 Ok(k) => k,
                 Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e).into()),
@@ -199,9 +190,9 @@ impl Response {
 }
 
 impl TryFrom<Response> for ffi::pam_response {
-    type Error = PamError;
+    type Error = Error;
 
-    fn try_from(value: Response) -> Result<Self, Self::Error> {
+    fn try_from(value: Response) -> Result<Self> {
         Ok(ffi::pam_response {
             resp: CString::new(value.resp)?.into_raw(),
             resp_retcode: value.retcode as c_int,
@@ -235,7 +226,7 @@ impl Handle {
         service_name: &str,
         user_name: &str,
         conversation: conv::Conversation,
-    ) -> PamResult<Self> {
+    ) -> Result<Self> {
         let service_name = CString::new(service_name)?;
         let user_name = CString::new(user_name)?;
 
@@ -268,7 +259,7 @@ impl Handle {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer").into());
         };
 
-        match RawError::try_from(ret as i32) {
+        match PamError::try_from(ret as i32) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(Self {
                 interior: pamh,
@@ -294,7 +285,7 @@ impl Handle {
     /// *This function is a safe interface to [`ffi::pam_set_item`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_set_item>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-set-item-3pam.html>
-    pub fn set_item(&self, item: Item) -> PamResult<()> {
+    pub fn set_item(&self, item: Item) -> Result<()> {
         let (item_ty, item): (c_int, *const c_void) = match item {
             Item::Service(s) => (
                 ItemType::Service as c_int,
@@ -354,7 +345,7 @@ impl Handle {
         self.last_retcode
             .store(ret, std::sync::atomic::Ordering::SeqCst);
 
-        match RawError::try_from(ret) {
+        match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
@@ -369,7 +360,7 @@ impl Handle {
     /// of the user failed.
     ///
     /// The application is free to call this function as many times as it wishes, but some modules
-    /// may maintain an internal retry counter an return [`RawError::MaxTries`] when it reaches a
+    /// may maintain an internal retry counter an return [`PamError::MaxTries`] when it reaches a
     /// defined limit.
     ///
     /// The PAM service module may request that the user enter their username via the conversation
@@ -380,7 +371,7 @@ impl Handle {
     /// *This function is a safe interface to [`ffi::pam_authenticate`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_authenticate>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-authenticate-3pam.html>
-    pub fn authenticate(&self, flags: Option<Flag>) -> PamResult<()> {
+    pub fn authenticate(&self, flags: Option<Flag>) -> Result<()> {
         let ret = unsafe {
             ffi::pam_authenticate(
                 self.interior,
@@ -395,7 +386,7 @@ impl Handle {
         self.last_retcode
             .store(ret, std::sync::atomic::Ordering::SeqCst);
 
-        match RawError::try_from(ret) {
+        match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
@@ -410,7 +401,7 @@ impl Handle {
     /// *This is a safe interface to [`ffi::pam_acct_mgmt`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_acct_mgmt>
     /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-acct-mgmt-3pam.html>
-    pub fn validate(&self, flags: Option<Flag>) -> PamResult<()> {
+    pub fn validate(&self, flags: Option<Flag>) -> Result<()> {
         let ret = unsafe {
             ffi::pam_acct_mgmt(
                 self.interior,
@@ -425,7 +416,7 @@ impl Handle {
         self.last_retcode
             .store(ret, std::sync::atomic::Ordering::SeqCst);
 
-        match RawError::try_from(ret) {
+        match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
@@ -436,7 +427,7 @@ impl Handle {
     /// *This function is a safe interface to [`ffi::pam_chauthtok`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_chauthtok>
     /// - <https://docs.oracle.com/cd/E86824_01/html/E54770/pam-chauthtok-3pam.html>
-    pub fn change_auth_token(&self, flags: Option<Flag>) -> PamResult<()> {
+    pub fn change_auth_token(&self, flags: Option<Flag>) -> Result<()> {
         let ret = unsafe {
             ffi::pam_chauthtok(
                 self.interior,
@@ -451,7 +442,7 @@ impl Handle {
         self.last_retcode
             .store(ret, std::sync::atomic::Ordering::SeqCst);
 
-        match RawError::try_from(ret) {
+        match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
@@ -467,7 +458,7 @@ impl Handle {
     /// *This function is a safe interface to [`ffi::pam_open_session`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_open_session>
     /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-open-session-3pam.html>
-    pub fn open_session(&self, flags: Option<Flag>) -> PamResult<()> {
+    pub fn open_session(&self, flags: Option<Flag>) -> Result<()> {
         let ret = unsafe {
             ffi::pam_open_session(
                 self.interior,
@@ -482,7 +473,7 @@ impl Handle {
         self.last_retcode
             .store(ret, std::sync::atomic::Ordering::SeqCst);
 
-        match RawError::try_from(ret) {
+        match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
@@ -496,7 +487,7 @@ impl Handle {
     /// *This function is a safe interface to [`ffi::pam_close_session`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_close_session>
     /// - <https://docs.oracle.com/cd/E36784_01/html/E36878/pam-close-session-3pam.html>
-    pub fn close_session(&self, flags: Option<i32>) -> PamResult<()> {
+    pub fn close_session(&self, flags: Option<i32>) -> Result<()> {
         let ret = unsafe {
             ffi::pam_close_session(
                 self.interior,
@@ -510,7 +501,7 @@ impl Handle {
         self.last_retcode
             .store(ret, std::sync::atomic::Ordering::SeqCst);
 
-        match RawError::try_from(ret) {
+        match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }

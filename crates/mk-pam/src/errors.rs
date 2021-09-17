@@ -5,31 +5,30 @@ use std::io;
 use std::str::Utf8Error;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use thiserror::Error as ThisError;
 
 use crate::ffi;
 
-pub type PamResult<T> = Result<T, PamError>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 /// All possible error types.
-#[derive(ThisError, Debug)]
-pub enum PamError {
-    /// Raw PAM error code.
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    /// Internal PAM library error.
     #[error("{0}")]
-    Raw(#[from] RawError),
+    Raw(#[from] PamError),
 
     /// IO Error.
     #[error("{0}")]
     Io(#[from] io::Error),
 }
 
-impl From<Utf8Error> for PamError {
+impl From<Utf8Error> for Error {
     fn from(e: Utf8Error) -> Self {
         Self::Io(io::Error::new(io::ErrorKind::InvalidData, e))
     }
 }
 
-impl From<NulError> for PamError {
+impl From<NulError> for Error {
     fn from(e: NulError) -> Self {
         Self::Io(io::Error::new(io::ErrorKind::InvalidData, e))
     }
@@ -38,9 +37,9 @@ impl From<NulError> for PamError {
 /// PAM return codes, treated as errors for easier handling.
 ///
 /// See [`pam(3)`](https://linux.die.net/man/3/pam) for more.
-#[derive(ThisError, IntoPrimitive, TryFromPrimitive, Debug, Clone)]
+#[derive(thiserror::Error, IntoPrimitive, TryFromPrimitive, Debug, Clone)]
 #[repr(i32)]
-pub enum RawError {
+pub enum PamError {
     /// Critical error.
     #[error("critical error")]
     Abort = ffi::PAM_ABORT as i32,

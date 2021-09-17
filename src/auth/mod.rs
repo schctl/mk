@@ -2,12 +2,14 @@
 
 use std::io;
 
-pub mod config;
+use crate::prelude::*;
+
+mod rules;
+pub use rules::*;
+
 #[cfg(feature = "pam")]
 pub mod pam;
 pub mod pwd;
-
-use crate::prelude::*;
 
 /// A user authentication agent.
 pub trait UserAuthenticator {
@@ -40,15 +42,19 @@ pub trait UserAuthenticator {
 /// This returns an [`std::io::Error`] of kind [`std::io::ErrorKind::NotFound`] if the feature for the
 /// given type of authenticator has not been specified.
 #[allow(unreachable_patterns)]
-pub fn new(user: mk_pwd::Passwd, cfg: config::AuthConfig) -> Result<Box<dyn UserAuthenticator>> {
-    Ok(match cfg.ty {
+pub fn new(
+    user: mk_pwd::Passwd,
+    ty: AuthService,
+    rules: Rules,
+) -> Result<Box<dyn UserAuthenticator>> {
+    Ok(match ty {
         #[cfg(feature = "pam")]
-        config::AuthService::Pam => Box::new(pam::PamAuthenticator::new(user, cfg.rules)?),
-        config::AuthService::Pwd => Box::new(pwd::PwdAuthenticator::new(user, cfg.rules)?),
+        AuthService::Pam => Box::new(pam::PamAuthenticator::new(user, rules)?),
+        AuthService::Pwd => Box::new(pwd::PwdAuthenticator::new(user, rules)?),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("unsupported authenticator {:?}", cfg.ty),
+                format!("unsupported authenticator {:?}", ty),
             )
             .into())
         }

@@ -363,6 +363,7 @@ dependencies = [
  "mk-pwd",
  "mk-shadow",
  "pwhash",
+ "readonly",
  "rpassword",
  "serde",
  "thiserror",
@@ -385,6 +386,7 @@ dependencies = [
  "lazy_static",
  "mk-common",
  "num_enum",
+ "readonly",
  "thiserror",
 ]
 
@@ -402,7 +404,6 @@ version = "0.0.1"
 dependencies = [
  "libc",
  "mk-common",
- "mk-pwd",
 ]
 
 [[package]]
@@ -550,6 +551,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d51e9f596de227fda2ea6c84607f5558e196eeaf43c986b724ba4fb8fdf497e7"
 dependencies = [
  "rand_core",
+]
+
+[[package]]
+name = "readonly"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45abc1c3a18669574c914b075cdc510c34bb3f1fb18f17b1ebf65ca5b3753796"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

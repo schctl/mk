@@ -109,13 +109,4 @@ impl Spwd {
             Self::from_raw(ptr)
         }
     }
-
-    /// Get a [`Spwd`] entry from a [`mk_pwd::Passwd`] entry.
-    ///
-    /// # Errors
-    ///
-    /// - [`io::Error`] if a user was not found or if an error occurred while processing.
-    pub fn from_passwd(pwd: &mk_pwd::Passwd) -> io::Result<Self> {
-        Self::from_name(&pwd.name[..])
-    }
 }

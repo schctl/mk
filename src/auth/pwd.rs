@@ -4,19 +4,20 @@
 
 use std::io;
 
-use super::config::Rules;
-use super::UserAuthenticator;
+use mk_pwd::Passwd;
+
+use super::{Rules, UserAuthenticator};
 use crate::prelude::*;
 
 /// Holds all the information required for authentication using the system password database.
 pub struct PwdAuthenticator {
-    user: mk_pwd::Passwd,
+    user: Passwd,
     #[allow(unused)]
     rules: Rules,
 }
 
 impl PwdAuthenticator {
-    pub fn new(user: mk_pwd::Passwd, rules: Rules) -> Result<Self> {
+    pub fn new(user: Passwd, rules: Rules) -> Result<Self> {
         // Result only for consistency
         Ok(Self { user, rules })
     }
@@ -78,7 +79,7 @@ impl PwdAuthenticator {
 }
 
 impl UserAuthenticator for PwdAuthenticator {
-    fn get_user(&self) -> &mk_pwd::Passwd {
+    fn get_user(&self) -> &Passwd {
         &self.user
     }
 
