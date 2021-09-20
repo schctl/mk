@@ -30,7 +30,7 @@ impl From<Utf8Error> for Error {
 
 impl From<NulError> for Error {
     fn from(e: NulError) -> Self {
-        Self::Io(io::Error::new(io::ErrorKind::InvalidData, e))
+        Self::Io(e.into())
     }
 }
 

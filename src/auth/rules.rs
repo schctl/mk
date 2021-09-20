@@ -6,26 +6,9 @@ use crate::prelude::*;
 
 /// Default field values.
 pub(crate) mod defaults {
-    use super::AuthService;
-    use super::Rules;
-
-    #[inline]
-    pub const fn ty() -> AuthService {
-        #[cfg(feature = "pam")]
-        return AuthService::Pam;
-
-        #[cfg(not(feature = "pam"))]
-        return AuthService::Pwd;
-    }
-
     #[inline]
     pub const fn timeout() -> i64 {
         2
-    }
-
-    #[inline]
-    pub const fn rules() -> Rules {
-        Rules { timeout: timeout() }
     }
 }
 
@@ -41,9 +24,19 @@ pub enum AuthService {
     Pwd,
 }
 
+impl Default for AuthService {
+    fn default() -> Self {
+        #[cfg(feature = "pam")]
+        return AuthService::Pam;
+
+        #[cfg(not(feature = "pam"))]
+        return AuthService::Pwd;
+    }
+}
+
 /// Predefined rules for a user session.
 #[readonly::make]
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct Rules {
     /// Validation timeout.
     #[serde(default = "defaults::timeout")]
@@ -55,5 +48,13 @@ impl Rules {
     #[inline]
     pub fn get_timeout(&self) -> Option<Duration> {
         utils::duration_from_minutes(self.timeout)
+    }
+}
+
+impl Default for Rules {
+    fn default() -> Self {
+        Self {
+            timeout: defaults::timeout(),
+        }
     }
 }

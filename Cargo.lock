@@ -386,7 +386,6 @@ dependencies = [
  "lazy_static",
  "mk-common",
  "num_enum",
- "readonly",
  "thiserror",
 ]
 
@@ -394,6 +393,7 @@ dependencies = [
 name = "mk-pwd"
 version = "0.0.1"
 dependencies = [
+ "lazy_static",
  "libc",
  "mk-common",
 ]
@@ -402,6 +402,7 @@ dependencies = [
 name = "mk-shadow"
 version = "0.0.1"
 dependencies = [
+ "lazy_static",
  "libc",
  "mk-common",
 ]

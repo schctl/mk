@@ -6,23 +6,22 @@ use std::io;
 use std::io::Read;
 use std::path::Path;
 
-use crate::auth;
+use crate::auth::AuthService;
+use crate::policy::Policy;
 use crate::prelude::*;
-use crate::session;
 
 /// Global `mk` configurations.
+#[readonly::make]
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Config {
-    /// Per user session rules.
+    /// All defined policies.
     #[serde(default = "HashMap::new")]
-    pub session: HashMap<String, session::Rules>,
-    /// Global authenticator configuration.
-    #[serde(rename = "auth-rules")]
-    #[serde(default = "auth::defaults::rules")]
-    pub auth: auth::Rules,
+    pub policies: HashMap<String, Policy>,
+    /// User policies. Values correspond to a predefined policy.
+    pub users: HashMap<String, String>,
     /// Default authentication service to use.
-    #[serde(default = "auth::defaults::ty")]
-    pub service: auth::AuthService,
+    #[serde(default = "AuthService::default")]
+    pub service: AuthService,
 }
 
 impl Config {
@@ -46,5 +45,15 @@ impl Config {
             Ok(c) => Ok(c),
             Err(e) => Err(io::Error::new(io::ErrorKind::Other, e).into()),
         }
+    }
+
+    pub fn get_user_policy(&self, user: &str) -> Option<&Policy> {
+        if let Some(user_policy) = self.users.get(user) {
+            if let Some(policy) = self.policies.get(user_policy) {
+                return Some(policy);
+            }
+        }
+
+        None
     }
 }

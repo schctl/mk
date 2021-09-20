@@ -2,6 +2,8 @@
 
 use std::io;
 
+pub type Result<T> = core::result::Result<T, Error>;
+
 /// All error types that we handle.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

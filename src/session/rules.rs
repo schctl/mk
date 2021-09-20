@@ -29,7 +29,7 @@ pub(crate) mod defaults {
 
 /// Predefined rules for a user session.
 #[readonly::make]
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct Rules {
     /// Maximum inactive duration after which the session must re-validate its user.
     #[serde(default = "defaults::timeout")]
@@ -51,5 +51,16 @@ impl Rules {
     #[inline]
     pub fn get_timeout(&self) -> Option<Duration> {
         utils::duration_from_minutes(self.timeout)
+    }
+}
+
+impl Default for Rules {
+    fn default() -> Self {
+        Self {
+            timeout: defaults::timeout(),
+            no_auth: defaults::no_auth(),
+            permitted: defaults::permitted(),
+            all_targets: defaults::all_targets(),
+        }
     }
 }

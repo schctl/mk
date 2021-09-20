@@ -3,9 +3,11 @@ name = "mk-common"
 
 license = "MIT"
 version = "0.0.1"
+authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
+
 edition = "2021"
 rust-version = "1.56"
-authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
+publish = false
 
 [dependencies]
 libc = "0.2"

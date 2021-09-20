@@ -9,6 +9,7 @@ pub mod cli;
 pub mod config;
 pub mod errors;
 pub mod options;
+pub mod policy;
 pub mod prelude;
 pub mod session;
 

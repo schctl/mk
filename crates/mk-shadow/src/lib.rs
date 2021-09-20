@@ -7,13 +7,16 @@
 
 use std::ffi::CString;
 use std::io;
-use std::time;
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime};
 
 use mk_common::*;
 
-/// Shadow routines are not thread safe. This is a safe guard against thread races.
-/// See <https://www.man7.org/linux/man-pages/man3/getspnam.3.html#ATTRIBUTES>.
-static SPNAME_LOCK: ResourceLock = ResourceLock::new(false);
+lazy_static::lazy_static! {
+    /// Shadow routines are not thread safe. This is a safe guard against thread races.
+    /// See <https://www.man7.org/linux/man-pages/man3/getspnam.3.html#ATTRIBUTES>.
+    pub(crate) static ref SPNAME_LOCK: Mutex<()> = Mutex::new(());
+}
 
 /// A single entry in the shadow file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,17 +26,17 @@ pub struct Spwd {
     /// Encrypted password.
     pub password: String,
     /// Date of last password change.
-    pub date_change: Option<std::time::SystemTime>,
+    pub date_change: Option<SystemTime>,
     /// The duration that must pass before the user's password can be changed.
-    pub password_age_min: Option<time::Duration>,
+    pub password_age_min: Option<Duration>,
     /// The duration after which the user's password must be changed.
-    pub password_age_max: Option<time::Duration>,
+    pub password_age_max: Option<Duration>,
     /// The duration before password expiry, in which the user will be warned to change their password.
-    pub password_warn_duration: Option<time::Duration>,
+    pub password_warn_duration: Option<Duration>,
     /// The duration after password expiry, after which the user's account will be disabled.
-    pub password_inactive_duration: Option<time::Duration>,
+    pub password_inactive_duration: Option<Duration>,
     /// Date when the user's account expired.
-    pub expiry: Option<time::SystemTime>,
+    pub expiry: Option<SystemTime>,
     /// Reserved field.
     pub flag: u64,
 }
@@ -48,35 +51,35 @@ impl Spwd {
         let raw = *ptr;
 
         Ok(Self {
-            name: cstr_to_string(raw.sp_namp)?,
-            password: cstr_to_string(raw.sp_pwdp)?,
+            name: chars_to_string(raw.sp_namp)?,
+            password: chars_to_string(raw.sp_pwdp)?,
             date_change: if raw.sp_lstchg >= 0 {
-                Some(time::UNIX_EPOCH + time::Duration::from_secs((raw.sp_lstchg as u64) * 86_400))
+                Some(SystemTime::UNIX_EPOCH + Duration::from_secs((raw.sp_lstchg as u64) * 86_400))
             } else {
                 None
             },
             password_age_min: if raw.sp_min >= 0 {
-                Some(time::Duration::from_secs((raw.sp_min as u64) * 86_400))
+                Some(Duration::from_secs((raw.sp_min as u64) * 86_400))
             } else {
                 None
             },
             password_age_max: if raw.sp_max >= 0 {
-                Some(time::Duration::from_secs((raw.sp_max as u64) * 86_400))
+                Some(Duration::from_secs((raw.sp_max as u64) * 86_400))
             } else {
                 None
             },
             password_warn_duration: if raw.sp_warn >= 0 {
-                Some(time::Duration::from_secs((raw.sp_warn as u64) * 86_400))
+                Some(Duration::from_secs((raw.sp_warn as u64) * 86_400))
             } else {
                 None
             },
             password_inactive_duration: if raw.sp_inact >= 0 {
-                Some(time::Duration::from_secs((raw.sp_inact as u64) * 86_400))
+                Some(Duration::from_secs((raw.sp_inact as u64) * 86_400))
             } else {
                 None
             },
             expiry: if raw.sp_expire >= 0 {
-                Some(time::UNIX_EPOCH + time::Duration::from_secs((raw.sp_expire as u64) * 86_400))
+                Some(SystemTime::UNIX_EPOCH + Duration::from_secs((raw.sp_expire as u64) * 86_400))
             } else {
                 None
             },
@@ -94,16 +97,16 @@ impl Spwd {
         // other error occurs during processing. We handle this with an early exit. Thread races
         // are checked using the global `SPNAME_LOCK`.
         unsafe {
-            let cname = CString::new(name)?;
+            let _lock = SPNAME_LOCK.lock().unwrap();
 
-            let ptr = fn_lock(
-                &SPNAME_LOCK,
-                || libc::getspnam(cname.as_ptr()),
-                || io::Error::new(io::ErrorKind::Interrupted, "thread locked"),
-            )?;
+            let c_name = CString::new(name)?;
+            let ptr = libc::getspnam(c_name.as_ptr());
 
             if ptr.is_null() {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer"));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "could not read shadow file",
+                ));
             }
 
             Self::from_raw(ptr)

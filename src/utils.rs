@@ -6,6 +6,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::time::Duration;
 
+use mk_common::*;
+
 /// Interpret an integer as a [`Duration`]. Intended for serialization in configurations.
 #[inline]
 pub fn duration_from_minutes(val: i64) -> Option<Duration> {
@@ -26,6 +28,27 @@ pub fn get_path() -> String {
         String::from("/usr/local/sbin:/usr/local/bin:/usr/bin"),
         |p| p.1,
     )
+}
+
+/// Get the real user ID of the calling process.
+#[must_use]
+#[inline]
+pub fn get_uid() -> Uid {
+    unsafe { libc::getuid() }
+}
+
+/// Get the effective user ID of the calling process.
+#[must_use]
+#[inline]
+pub fn get_euid() -> Uid {
+    unsafe { libc::geteuid() }
+}
+
+// Get the PID of the parent process.
+#[must_use]
+#[inline]
+pub fn get_parent_pid() -> Pid {
+    unsafe { libc::getppid() }
 }
 
 /// Change a given file's mode.

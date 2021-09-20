@@ -3,5 +3,5 @@
 use mk::cli;
 
 fn main() {
-    cli::run(std::env::args());
+    cli::run(std::env::args().into_iter().collect());
 }

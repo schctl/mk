@@ -12,14 +12,10 @@ pub use app::App;
 
 fn exit_with_err(err: Error) -> ! {
     eprintln!("{}: {}", SERVICE_NAME, err);
-    exit(0);
+    exit(-1);
 }
 
-pub fn run<I, T>(args: I) -> !
-where
-    I: IntoIterator<Item = T>,
-    T: Into<String> + Clone,
-{
+pub fn run(args: Vec<String>) -> ! {
     let opts = match options::from_terminal(args) {
         Err(e) => exit_with_err(e),
         Ok(i) => i,

@@ -11,9 +11,13 @@ name = "mk"
 
 license = "MIT"
 version = "0.0.1"
+readme = "README.md"
+authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
+description = "Run commands as another user"
+
 edition = "2021"
 rust-version = "1.56"
-authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
+default-run = "mk"
 
 [profile.release]
 lto = true

@@ -30,22 +30,22 @@ fn pam_conversation(
     messages: &mut [pam::conv::MessageContainer],
 ) -> core::result::Result<(), pam::PamError> {
     for msg in messages {
-        let resp = match msg.msg.kind {
+        let resp = match msg.get().kind() {
             pam::MessageType::PromptEcho | pam::MessageType::Prompt => {
-                Some(pam_prompt(&msg.msg.contents[..])?)
+                Some(pam_prompt(&msg.get().contents()[..])?)
             }
             pam::MessageType::ShowText => {
-                println!("[{}] {}", SERVICE_NAME, msg.msg.contents);
+                println!("[{}] {}", SERVICE_NAME, msg.get().contents());
                 None
             }
             pam::MessageType::ShowError => {
-                eprintln!("[{}] {}", SERVICE_NAME, msg.msg.contents);
+                eprintln!("[{}] {}", SERVICE_NAME, msg.get().contents());
                 None
             }
             _ => None,
         };
 
-        msg.set_response(resp);
+        msg.resp = resp;
     }
 
     Ok(())
@@ -61,23 +61,11 @@ pub struct PamAuthenticator {
 
 impl PamAuthenticator {
     pub fn new(user: mk_pwd::Passwd, rules: Rules) -> Result<Self> {
-        let handle = {
-            // Create conversation function
-            let conv = pam::conv::Conversation {
-                conv: Box::new(pam_conversation),
-            };
+        let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], Box::new(pam_conversation))?;
 
-            let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], conv)?;
+        handle.items().set_request_user(&user.name[..])?;
 
-            // Set requesting user.
-            if let Err(e) = handle.set_item(pam::Item::RequestUser(user.name.clone())) {
-                return Err(e.into());
-            }
-
-            // TODO: host name
-
-            handle
-        };
+        // TODO: host name
 
         Ok(Self {
             user,

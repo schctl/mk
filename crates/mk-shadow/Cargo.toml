@@ -3,10 +3,12 @@ name = "mk-shadow"
 
 license = "MIT"
 version = "0.0.1"
+authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
+
 edition = "2021"
 rust-version = "1.56"
-authors = ["Sachin Cherian <sachinctl@protonmail.com>"]
 
 [dependencies]
 libc = "0.2"
+lazy_static = "1.4"
 mk-common = { path = "../mk-common" }

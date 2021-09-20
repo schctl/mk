@@ -4,12 +4,15 @@
 
 use std::ffi::CString;
 use std::io;
+use std::sync::Mutex;
 
 use mk_common::*;
 
-/// `getpwnam` is not thread safe. This is a safe guard against thread races.
-/// See <https://man7.org/linux/man-pages/man3/getpwnam.3p.html#DESCRIPTION>.
-static PWNAME_LOCK: ResourceLock = ResourceLock::new(false);
+lazy_static::lazy_static! {
+    /// `getpwnam` is not thread safe. This is a safe guard against thread races.
+    /// See <https://man7.org/linux/man-pages/man3/getpwnam.3p.html#DESCRIPTION>.
+    pub(crate) static ref PWNAME_LOCK: Mutex<()> = Mutex::new(());
+}
 
 /// A single entry in the password database.
 ///
@@ -35,6 +38,10 @@ pub struct Passwd {
 impl Passwd {
     /// Get a `passwd` entry from a raw [`libc::passwd`] pointer.
     ///
+    /// # Errors
+    ///
+    /// This function can fail if any of the information contains invalid utf-8. See [`chars_to_string`].
+    ///
     /// # Safety
     ///
     /// `ptr` must be a valid pointer to a [`libc::passwd`].
@@ -42,20 +49,20 @@ impl Passwd {
         let raw = *ptr;
 
         Ok(Self {
-            name: cstr_to_string(raw.pw_name)?,
-            password: match cstr_to_string(raw.pw_passwd) {
+            name: chars_to_string(raw.pw_name)?,
+            password: match chars_to_string(raw.pw_passwd) {
                 // Set to nullptr if user doesn't have a password
                 Ok(p) => Some(p),
                 Err(_) => None,
             },
             uid: raw.pw_uid,
             gid: raw.pw_gid,
-            gecos: match cstr_to_string(raw.pw_gecos) {
+            gecos: match chars_to_string(raw.pw_gecos) {
                 Ok(p) => Some(p),
                 Err(_) => None,
             },
-            directory: cstr_to_string(raw.pw_dir)?,
-            shell: cstr_to_string(raw.pw_shell)?,
+            directory: chars_to_string(raw.pw_dir)?,
+            shell: chars_to_string(raw.pw_shell)?,
         })
     }
 
@@ -69,11 +76,9 @@ impl Passwd {
         // other error occurs during processing. We handle this with an early exit. Thread races
         // are checked using the global `PWNAME_LOCK`.
         unsafe {
-            let ptr = fn_lock(
-                &PWNAME_LOCK,
-                || libc::getpwuid(uid),
-                || io::Error::new(io::ErrorKind::Interrupted, "thread locked"),
-            )?;
+            let _lock = PWNAME_LOCK.lock().unwrap();
+
+            let ptr = libc::getpwuid(uid);
 
             if ptr.is_null() {
                 return Err(io::Error::new(
@@ -96,13 +101,10 @@ impl Passwd {
         // other error occurs during processing. We handle this with an early exit. Thread races
         // are checked using the global `PWNAME_LOCK`.
         unsafe {
-            let cname = CString::new(name)?;
+            let _lock = PWNAME_LOCK.lock().unwrap();
 
-            let ptr = fn_lock(
-                &PWNAME_LOCK,
-                || libc::getpwnam(cname.as_ptr()),
-                || io::Error::new(io::ErrorKind::Interrupted, "thread locked"),
-            )?;
+            let c_name = CString::new(name)?;
+            let ptr = libc::getpwnam(c_name.as_ptr());
 
             if ptr.is_null() {
                 return Err(io::Error::new(

@@ -45,10 +45,10 @@ pub mod ffi {
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(i32)]
 #[non_exhaustive]
-pub enum ItemType {
+pub(crate) enum ItemKind {
     /// The name of the requesting service.
     Service = ffi::PAM_SERVICE as i32,
-    /// The name of the user that the application is trying to authenticate.
+    /// ...
     User = ffi::PAM_USER as i32,
     /// The string used when prompting for a user's name.
     UserPrompt = ffi::PAM_USER_PROMPT as i32,
@@ -57,10 +57,7 @@ pub enum ItemType {
     /// The name must be prefixed by `/dev/` if it is a device file. For graphical, X-based,
     /// applications the value for this item should be the `DISPLAY` environment variable.
     Tty = ffi::PAM_TTY as i32,
-    /// The name of the user requesting authentication (the applicant).
-    ///
-    /// Local name for a locally requesting user or a remote user name for a remote requesting user.
-    /// `RequestUser@RequestHost` should always identify the requesting user.
+    /// ...
     RequestUser = ffi::PAM_RUSER as i32,
     /// The name of the applicant's host machine.
     RequestHost = ffi::PAM_RHOST as i32,
@@ -73,27 +70,34 @@ pub enum ItemType {
     // TODO: Linux-PAM specific items
 }
 
-/// Information corresponding to an [`ItemType`].
-#[derive(Debug)]
-pub enum Item {
-    /// See [`ItemType::Service`].
-    Service(String),
-    /// See [`ItemType::User`].
-    User(String),
-    /// See [`ItemType::UserPrompt`].
-    UserPrompt(String),
-    /// See [`ItemType::Tty`].
-    Tty(String),
-    /// See [`ItemType::RequestUser`].
-    RequestUser(String),
-    /// See [`ItemType::RequestHost`].
-    RequestHost(String),
-    /// See [`ItemType::AuthToken`].
-    AuthToken(String),
-    /// See [`ItemType::OldAuthToken`].
-    OldAuthToken(String),
-    /// See [`ItemType::Conversation`].
-    Conversation(conv::Conversation),
+/// Manages PAM items associated with a [`Handle`].
+pub struct Items<'a> {
+    handle: &'a Handle,
+}
+
+impl<'a> Items<'a> {
+    #[inline(always)]
+    fn set_str(&self, data: &str) -> Result<()> {
+        self.handle.set_item(
+            ItemKind::RequestUser as c_int,
+            CString::new(data)?.into_raw() as *const c_void,
+        )
+    }
+
+    /// The name of the user that the application is trying to authenticate.
+    #[inline]
+    pub fn set_user(&self, user: &str) -> Result<()> {
+        self.set_str(user)
+    }
+
+    /// The name of the user requesting authentication (the applicant).
+    ///
+    /// Local name for a locally requesting user or a remote user name for a remote requesting user.
+    /// `RequestUser@RequestHost` should always identify the requesting user.
+    #[inline]
+    pub fn set_request_user(&self, user: &str) -> Result<()> {
+        self.set_str(user)
+    }
 }
 
 bitflags::bitflags! {
@@ -122,13 +126,12 @@ pub enum MessageType {
 }
 
 /// A PAM message.
-#[readonly::make]
 #[derive(Debug)]
 pub struct Message {
     /// The actual message.
-    pub contents: String,
+    contents: String,
     /// The type of message.
-    pub kind: MessageType,
+    kind: MessageType,
 }
 
 impl Message {
@@ -136,6 +139,16 @@ impl Message {
     #[must_use]
     pub fn new(contents: String, kind: MessageType) -> Self {
         Self { contents, kind }
+    }
+
+    #[inline]
+    pub fn contents(&self) -> &String {
+        &self.contents
+    }
+
+    #[inline]
+    pub fn kind(&self) -> MessageType {
+        self.kind
     }
 }
 
@@ -150,7 +163,7 @@ impl TryFrom<*const ffi::pam_message> for Message {
         }
 
         let value = unsafe { *value };
-        let contents = unsafe { mk_common::cstr_to_string(value.msg as *mut c_char)? };
+        let contents = unsafe { mk_common::chars_to_string(value.msg as *mut c_char)? };
 
         Ok(Self {
             contents,
@@ -176,16 +189,6 @@ impl Response {
     #[must_use]
     pub fn new(resp: String, retcode: i64) -> Self {
         Self { resp, retcode }
-    }
-
-    /// Get the actual response contained.
-    pub fn get(&self) -> &String {
-        &self.resp
-    }
-
-    /// Reserved field.
-    pub fn retcode(&self) -> i64 {
-        self.retcode
     }
 }
 
@@ -225,20 +228,13 @@ impl Handle {
     pub fn start(
         service_name: &str,
         user_name: &str,
-        conversation: conv::Conversation,
+        conversation: conv::ConversationCallback,
     ) -> Result<Self> {
         let service_name = CString::new(service_name)?;
         let user_name = CString::new(user_name)?;
 
         let conv = {
-            // Insert conversation into the global conversation map
-            // with its id as the index in the map.
-            let mut global_ptr_lock = conv::GLOBAL_CONV_PTRS.lock().unwrap();
-            let mut index = global_ptr_lock.len() as c_int;
-            while global_ptr_lock.contains_key(&index) {
-                index += 1
-            }
-            global_ptr_lock.insert(index, conversation);
+            let index = conv::Conversation::add(conversation);
 
             ffi::pam_conv {
                 conv: Some(conv::__raw_pam_conv),
@@ -255,17 +251,18 @@ impl Handle {
             unsafe { ffi::pam_start(service_name.as_ptr(), user_name.as_ptr(), &conv, &mut pamh) }
                 as i32;
 
+        if let Ok(e) = PamError::try_from(ret as i32) {
+            return Err(e.into());
+        }
+
         if pamh.is_null() {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "null pointer").into());
         };
 
-        match PamError::try_from(ret as i32) {
-            Ok(e) => Err(e.into()),
-            Err(_) => Ok(Self {
-                interior: pamh,
-                last_retcode: AtomicI32::new(ret),
-            }),
-        }
+        Ok(Self {
+            interior: pamh,
+            last_retcode: AtomicI32::new(ret),
+        })
     }
 
     /// Terminates the PAM transaction and destroys the corresponding PAM context.
@@ -285,70 +282,31 @@ impl Handle {
     /// *This function is a safe interface to [`ffi::pam_set_item`]. To read more, here are a few links:*
     /// - <https://linux.die.net/man/3/pam_set_item>
     /// - <https://docs.oracle.com/cd/E88353_01/html/E37847/pam-set-item-3pam.html>
-    pub fn set_item(&self, item: Item) -> Result<()> {
-        let (item_ty, item): (c_int, *const c_void) = match item {
-            Item::Service(s) => (
-                ItemType::Service as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::User(s) => (
-                ItemType::User as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::UserPrompt(s) => (
-                ItemType::UserPrompt as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::Tty(s) => (
-                ItemType::Tty as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::RequestUser(s) => (
-                ItemType::RequestUser as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::RequestHost(s) => (
-                ItemType::RequestHost as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::AuthToken(s) => (
-                ItemType::AuthToken as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::OldAuthToken(s) => (
-                ItemType::OldAuthToken as c_int,
-                CString::new(s)?.as_ptr() as *const c_void,
-            ),
-            Item::Conversation(s) => {
-                // Add conversation to the global conversation map.
-                let mut global_ptr_lock = conv::GLOBAL_CONV_PTRS.lock().unwrap();
-                let mut index = global_ptr_lock.len() as c_int;
-                while global_ptr_lock.contains_key(&index) {
-                    index += 1
-                }
-                global_ptr_lock.insert(index as c_int, s);
+    pub(crate) fn set_item(&self, kind: c_int, item: *const c_void) -> Result<()> {
+        let ret = unsafe { ffi::pam_set_item(self.interior, kind, item) } as i32;
 
-                let conv = ffi::pam_conv {
-                    conv: Some(conv::__raw_pam_conv),
-                    appdata_ptr: { index as *mut c_void },
-                };
-
-                (
-                    ItemType::Conversation as c_int,
-                    &conv as *const ffi::pam_conv as *const c_void,
-                )
-            }
-        };
-
-        let ret = unsafe { ffi::pam_set_item(self.interior, item_ty, item) } as i32;
-
-        self.last_retcode
-            .store(ret, std::sync::atomic::Ordering::SeqCst);
+        self.last_retcode.store(ret, Ordering::SeqCst);
 
         match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
             Err(_) => Ok(()),
         }
+    }
+
+    /// Access and update information of a PAM item type.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use mk_pam::Handle;
+    ///
+    /// let handle = Handle::start("foo", "more_foo", Box::new(|_| Ok(()))).unwrap();
+    ///
+    /// handle.items().set_user("more_foo").unwrap();
+    /// handle.authenticate(None).unwrap();
+    /// ```
+    pub fn items(&self) -> Items<'_> {
+        Items { handle: self }
     }
 
     // TODO: `pam_get_item`
@@ -383,8 +341,7 @@ impl Handle {
             )
         } as i32;
 
-        self.last_retcode
-            .store(ret, std::sync::atomic::Ordering::SeqCst);
+        self.last_retcode.store(ret, Ordering::SeqCst);
 
         match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
@@ -413,8 +370,7 @@ impl Handle {
             )
         } as i32;
 
-        self.last_retcode
-            .store(ret, std::sync::atomic::Ordering::SeqCst);
+        self.last_retcode.store(ret, Ordering::SeqCst);
 
         match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
@@ -439,8 +395,7 @@ impl Handle {
             )
         } as i32;
 
-        self.last_retcode
-            .store(ret, std::sync::atomic::Ordering::SeqCst);
+        self.last_retcode.store(ret, Ordering::SeqCst);
 
         match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
@@ -470,8 +425,7 @@ impl Handle {
             )
         } as i32;
 
-        self.last_retcode
-            .store(ret, std::sync::atomic::Ordering::SeqCst);
+        self.last_retcode.store(ret, Ordering::SeqCst);
 
         match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),
@@ -498,8 +452,7 @@ impl Handle {
             )
         } as i32;
 
-        self.last_retcode
-            .store(ret, std::sync::atomic::Ordering::SeqCst);
+        self.last_retcode.store(ret, Ordering::SeqCst);
 
         match PamError::try_from(ret) {
             Ok(e) => Err(e.into()),

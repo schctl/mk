@@ -7,7 +7,6 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
-use mk_common::{get_parent_pid, get_uid};
 use mk_pwd::Passwd;
 
 use crate::auth;
@@ -21,25 +20,26 @@ pub struct App {
 }
 
 impl App {
-    /// Directory to which session state files are stored.
-    const SESSION_DIR: &'static str = "/var/run/mk/sess";
+    pub fn new(cfg: Config) -> Result<Self> {
+        let user = Passwd::from_uid(utils::get_uid())?;
 
-    pub fn new(mut cfg: Config) -> Result<Self> {
-        let user = Passwd::from_uid(get_uid())?;
-
-        if let Some(c) = cfg.session.remove_entry(&user.name) {
+        if let Some(policy) = cfg.get_user_policy(&user.name) {
             let session_state = Self::recover_session_state_or_new(&user)?;
 
             let session = UserSession::with_state(
-                auth::new(user, cfg.service, cfg.auth)?,
-                c.1,
+                auth::new(user, cfg.service, policy.auth.clone())?,
+                policy.session.clone(),
                 session_state,
             );
 
-            Ok(Self { session })
-        } else {
-            Err(io::Error::new(io::ErrorKind::PermissionDenied, "no found session").into())
+            return Ok(Self { session });
         }
+
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "no defined policy for this user",
+        )
+        .into())
     }
 
     /// Run the appropriate method for given options.
@@ -48,13 +48,19 @@ impl App {
     ///
     /// Exit status of the process run (if any).
     pub fn run(&mut self, options: MkOptions) -> Result<Option<i32>> {
-        match options {
-            MkOptions::Command(cmd) => return self.exec(cmd),
-            MkOptions::Text(s) => println!("{}", s),
-            _ => {}
-        }
+        let res = match options {
+            MkOptions::Command(cmd) => self.exec(cmd),
+            MkOptions::Text(s) => {
+                println!("{}", s);
+                Ok(None)
+            }
+            _ => Ok(None),
+        };
 
-        Ok(None)
+        // we'll probably log this later
+        let _ = Self::save_session_state(&self.session);
+
+        res
     }
 
     /// Execute a command with the given `options`.
@@ -63,34 +69,36 @@ impl App {
     ///
     /// Exit status of the process run (if any).
     pub fn exec(&mut self, options: CommandOptions) -> Result<Option<i32>> {
+        let exit = Cell::new(None);
         let target = &options.target;
 
-        let exit = Cell::new(None);
+        self.session.run(
+            target,
+            Box::new(|| -> Result<()> {
+                let mut command = Command::new(&options.command[..]);
 
-        let session: Box<dyn FnOnce() -> Result<()>> = Box::new(|| -> Result<()> {
-            let mut command = Command::new(&options.command[..]);
+                command.uid(options.target.uid);
+                command.gid(options.target.gid);
 
-            command.uid(options.target.uid);
-            command.gid(options.target.gid);
+                command.args(options.args);
 
-            command.args(options.args);
+                // TODO: env preservation
 
-            // TODO: env preservation
+                if let Some(c) = command.spawn()?.wait()?.code() {
+                    let _ = &exit.set(Some(c));
+                }
 
-            if let Some(c) = command.spawn()?.wait()?.code() {
-                let _ = &exit.set(Some(c));
-            }
-
-            Ok(())
-        });
-
-        self.session.run(target, session)??;
-
-        // we'll probably log this later
-        let _ = Self::save_session_state(&self.session);
+                Ok(())
+            }),
+        )??;
 
         Ok(exit.into_inner())
     }
+
+    // Session related stuff
+
+    /// Directory to which session state files are stored.
+    const SESSION_DIR: &'static str = "/var/run/mk/sess";
 
     /// Try to save a session state to a file for later recovery.
     fn save_session_state(session: &UserSession) -> Result<()> {
@@ -102,7 +110,11 @@ impl App {
         }
         utils::set_mode(&path, 0o600)?;
 
-        path.push(format!("{}-{}", session.get_user().name, get_parent_pid()));
+        path.push(format!(
+            "{}-{}",
+            session.get_user().name,
+            utils::get_parent_pid()
+        ));
 
         let mut f = fs::File::create(&path)?;
         session.get_state().try_dump(&mut f)?;
@@ -117,14 +129,13 @@ impl App {
         let mut path = PathBuf::new();
 
         path.push(Self::SESSION_DIR);
-        path.push(format!("{}-{}", user.name, get_parent_pid()));
+        path.push(format!("{}-{}", user.name, utils::get_parent_pid()));
 
         if !path.exists() {
             return Ok(State::new());
         }
 
         let mut f = fs::File::open(path)?;
-
         State::try_recover(&mut f)
     }
 }
