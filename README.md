@@ -17,19 +17,14 @@
 
 | Flag | Description |
 |------|-------------|
-| `pam` | Builds with authenticator support for [`PAM`](https://en.wikipedia.org/wiki/Pluggable_authentication_module) |
-| `shadow` | Builds with authenticator support for reading shadow files |
+| `pam` | Builds with for authentication using [`PAM`](https://en.wikipedia.org/wiki/Pluggable_authentication_module) (requires `libpam`) |
+| `shadow` | Builds with support for authentication using the shadow password database |
 
-`s.py` attempts to output a list of supported features on your system.
+## Configuration
 
-#### Building with supported features
-
-```sh
-cargo build --features $(./s.py)
-```
+`mk` searches for rules defined in `/etc/mk.conf`, configured in the [`TOML`](https://toml.io/en/) format.
 
 ---
-
 
 ### Disclaimer
 

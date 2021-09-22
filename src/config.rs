@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::io::Read;
 use std::path::Path;
 
 use crate::auth::AuthService;
@@ -12,12 +11,13 @@ use crate::prelude::*;
 
 /// Global `mk` configurations.
 #[readonly::make]
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     /// All defined policies.
     #[serde(default = "HashMap::new")]
     pub policies: HashMap<String, Policy>,
     /// User policies. Values correspond to a predefined policy.
+    #[serde(default = "HashMap::new")]
     pub users: HashMap<String, String>,
     /// Default authentication service to use.
     #[serde(default = "AuthService::default")]
@@ -26,34 +26,15 @@ pub struct Config {
 
 impl Config {
     /// Try to read configurations from a file.
+    #[inline]
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut f = match fs::File::open(path) {
-            Ok(f) => f,
-            Err(e) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("could not find configuration file: {}", e),
-                )
-                .into())
-            }
-        };
-
-        let mut contents = String::new();
-        f.read_to_string(&mut contents)?;
-
-        match toml::from_str(&contents[..]) {
-            Ok(c) => Ok(c),
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e).into()),
-        }
+        toml::from_str(&fs::read_to_string(path)?[..])
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e).into())
     }
 
+    #[must_use]
+    #[inline]
     pub fn get_user_policy(&self, user: &str) -> Option<&Policy> {
-        if let Some(user_policy) = self.users.get(user) {
-            if let Some(policy) = self.policies.get(user_policy) {
-                return Some(policy);
-            }
-        }
-
-        None
+        self.users.get(user).and_then(|s| self.policies.get(s))
     }
 }

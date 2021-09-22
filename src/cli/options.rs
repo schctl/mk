@@ -65,7 +65,7 @@ pub fn from_terminal(args: Vec<String>) -> Result<MkOptions> {
     // Parse command options from external subcommand
     if let Some((ext_cmd, ext_args)) = matches.subcommand() {
         let args = match ext_args.values_of("") {
-            Some(v) => v.into_iter().map(|s| s.to_string()).collect(),
+            Some(v) => v.into_iter().map(std::borrow::ToOwned::to_owned).collect(),
             _ => Vec::new(),
         };
 
@@ -75,7 +75,7 @@ pub fn from_terminal(args: Vec<String>) -> Result<MkOptions> {
             args,
             preserve_env: matches
                 .value_of("preserve-env")
-                .map(|s| s.split(',').map(|s| s.to_owned()).collect()),
+                .map(|s| s.split(',').map(std::borrow::ToOwned::to_owned).collect()),
         }));
     }
 

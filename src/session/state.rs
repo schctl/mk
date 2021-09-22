@@ -1,7 +1,8 @@
 use std::io::prelude::*;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+use mk_common::*;
 
 use crate::prelude::*;
 
@@ -24,15 +25,18 @@ impl State {
         Self { last_used: None }
     }
 
+    /// Update the session's last time of use.
+    #[inline]
+    pub fn use_now(&mut self) {
+        self.last_used = Some(SystemTime::now());
+    }
+
     /// Try to recover a session's state from a reader.
     pub fn try_recover<T: Read>(reader: &mut T) -> Result<Self> {
         let cookie = reader.read_i64::<NativeEndian>()?;
 
-        let last_used = if cookie < 0 {
-            None
-        } else {
-            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(cookie as u64))
-        };
+        let last_used =
+            de_duration(cookie, DurationResolution::Minutes).map(|d| SystemTime::UNIX_EPOCH + d);
 
         Ok(Self { last_used })
     }
@@ -41,19 +45,18 @@ impl State {
     ///
     /// # Serialization format
     ///
-    /// Fields serialized **in order**. There will probably be more fields added in the future.
+    /// Fields are serialized **in order**. There could be more fields added in the future.
     ///
     /// | Field       | Type |
     /// |-------------|------|
-    /// | last_used | i64  |
+    /// | `last_used` | i64  |
     pub fn try_dump<T: Write>(&self, writer: &mut T) -> Result<usize> {
-        let cookie = match self.last_used {
-            Some(s) => match s.duration_since(SystemTime::UNIX_EPOCH) {
-                Ok(d) => d.as_secs() as i64,
-                Err(_) => -1,
-            },
-            None => -1,
-        };
+        let cookie = ser_duration(
+            &self
+                .last_used
+                .and_then(|d| d.duration_since(SystemTime::UNIX_EPOCH).ok()),
+            DurationResolution::Minutes,
+        );
 
         writer.write_i64::<NativeEndian>(cookie)?;
 

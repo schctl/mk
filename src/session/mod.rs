@@ -1,6 +1,5 @@
 //! Authenticated session tools.
 
-use std::io;
 use std::time::SystemTime;
 
 use mk_pwd::Passwd;
@@ -29,21 +28,27 @@ pub struct UserSession {
 
 impl UserSession {
     /// Create a new session for this user.
+    #[must_use]
     pub fn new(auth: Box<dyn UserAuthenticator>, rules: Rules) -> Self {
         Self::with_state(auth, rules, State::new())
     }
 
     /// Create a new session from existing state.
+    #[must_use]
     pub fn with_state(auth: Box<dyn UserAuthenticator>, rules: Rules, state: State) -> Self {
         Self { state, auth, rules }
     }
 
     /// Get the current state of this session.
+    #[must_use]
+    #[inline]
     pub fn get_state(&self) -> &State {
         &self.state
     }
 
     /// Get the user this session is associated with.
+    #[must_use]
+    #[inline]
     pub fn get_user(&self) -> &Passwd {
         self.auth.get_user()
     }
@@ -63,18 +68,6 @@ impl UserSession {
         target: &mk_pwd::Passwd,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
     ) -> Result<Result<()>> {
-        // ᕙ(⇀‸↼‵‵)ᕗ
-        if !(self.auth.get_user() == target
-            || self.rules.permitted.contains(&target.name)
-            || self.rules.all_targets)
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                format!("not permitted to run as user {}", target.name),
-            )
-            .into());
-        }
-
         // Check if the user needs to be re-validated
         if !self.rules.no_auth {
             let mut need_auth = true;
@@ -82,7 +75,7 @@ impl UserSession {
             // Check if the session has exceeded its timeout
             if let Some(s) = self.state.last_used {
                 if let Ok(dur) = SystemTime::now().duration_since(s) {
-                    if let Some(t) = self.rules.get_timeout() {
+                    if let Some(t) = self.rules.timeout {
                         need_auth = dur > t;
                     }
                 }
@@ -92,9 +85,9 @@ impl UserSession {
                 self.auth.validate()?;
             }
 
-            self.state.last_used = Some(SystemTime::now());
+            self.state.use_now();
         }
 
-        self.auth.session(session)
+        self.auth.session(session, target)
     }
 }

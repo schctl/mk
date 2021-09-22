@@ -6,23 +6,15 @@ use crate::prelude::*;
 
 /// Default field values.
 pub(crate) mod defaults {
+    use super::*;
+
     #[inline]
-    pub const fn timeout() -> i64 {
-        -1
+    pub const fn timeout() -> Option<Duration> {
+        None
     }
 
     #[inline]
     pub const fn no_auth() -> bool {
-        false
-    }
-
-    #[inline]
-    pub const fn permitted() -> Vec<String> {
-        Vec::new()
-    }
-
-    #[inline]
-    pub const fn all_targets() -> bool {
         false
     }
 }
@@ -32,26 +24,12 @@ pub(crate) mod defaults {
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct Rules {
     /// Maximum inactive duration after which the session must re-validate its user.
+    #[serde(with = "utils::timeout_serializer")]
     #[serde(default = "defaults::timeout")]
-    timeout: i64,
+    pub timeout: Option<Duration>,
     /// Allow session to forego user validation.
     #[serde(default = "defaults::no_auth")]
     pub no_auth: bool,
-    /// Permitted targets.
-    #[serde(default = "defaults::permitted")]
-    pub permitted: Vec<String>,
-    /// Permit running as all targets. This will cause the session to ignore the `permitted` field.
-    #[serde(rename = "all-targets")]
-    #[serde(default = "defaults::all_targets")]
-    pub all_targets: bool,
-}
-
-impl Rules {
-    /// Interpret the serialized timeout as a [`Duration`].
-    #[inline]
-    pub fn get_timeout(&self) -> Option<Duration> {
-        utils::duration_from_minutes(self.timeout)
-    }
 }
 
 impl Default for Rules {
@@ -59,8 +37,17 @@ impl Default for Rules {
         Self {
             timeout: defaults::timeout(),
             no_auth: defaults::no_auth(),
-            permitted: defaults::permitted(),
-            all_targets: defaults::all_targets(),
+        }
+    }
+}
+
+impl Rules {
+    /// Root user session overrides.
+    #[must_use]
+    pub fn root() -> Self {
+        Self {
+            no_auth: true,
+            ..Self::default()
         }
     }
 }

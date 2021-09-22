@@ -1,4 +1,4 @@
-//! PAM conversation types.
+//! PAM conversation handling.
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -20,12 +20,12 @@ lazy_static::lazy_static! {
     static ref GLOBAL_CONV_PTRS: Mutex<HashMap<usize, Conversation>> = Mutex::new(HashMap::new());
 }
 
+/// PAM conversation function. This will be called by a loaded PAM module.
 pub type ConversationCallback =
     Box<dyn Fn(&mut [MessageContainer]) -> core::result::Result<(), PamError>>;
 
-/// Contains the PAM conversation function. This will be called by a loaded PAM module.
-pub struct Conversation {
-    /// Unlike the regular PAM conversation function, this is called for every message provided.
+/// Container for a PAM conversation.
+pub(crate) struct Conversation {
     conv: ConversationCallback,
 }
 
@@ -53,27 +53,6 @@ impl Conversation {
 
 unsafe impl Send for Conversation {}
 unsafe impl Sync for Conversation {}
-
-/// Structure used in a PAM conversation, containing the message sent from a module,
-/// and its corresponding response, if any.
-#[derive(Debug)]
-pub struct MessageContainer {
-    pub msg: Message,
-    pub resp: Option<Response>,
-}
-
-impl MessageContainer {
-    #[must_use]
-    pub fn new(msg: Message) -> Self {
-        Self { msg, resp: None }
-    }
-
-    /// Get the contained message.
-    #[inline]
-    pub fn get(&self) -> &Message {
-        &self.msg
-    }
-}
 
 /// Exported PAM conversation function.
 ///

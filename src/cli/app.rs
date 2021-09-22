@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::fs;
 use std::io;
-use std::os::unix::process::CommandExt;
+use std::os::unix::process::{parent_id, CommandExt};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -12,17 +12,36 @@ use mk_pwd::Passwd;
 use crate::auth;
 use crate::config::Config;
 use crate::options::*;
+use crate::permits::Permits;
+use crate::policy::Policy;
 use crate::prelude::*;
 use crate::session::{State, UserSession};
 
 pub struct App {
     session: UserSession,
+    permits: Permits,
 }
 
 impl App {
-    pub fn new(cfg: Config) -> Result<Self> {
-        let user = Passwd::from_uid(utils::get_uid())?;
+    pub fn new(cfg: &Config) -> Result<Self> {
+        let uid = utils::get_uid();
+        let user = Passwd::from_uid(uid)?;
 
+        // Ignore configs if the user is root
+        if uid == 0 {
+            let policy = Policy::root();
+            let session = UserSession::new(
+                auth::new(user, cfg.service, policy.auth.clone())?,
+                policy.session.clone(),
+            );
+
+            return Ok(Self {
+                session,
+                permits: policy.permits.clone(),
+            });
+        }
+
+        // Find a suitable policy and create a session
         if let Some(policy) = cfg.get_user_policy(&user.name) {
             let session_state = Self::recover_session_state_or_new(&user)?;
 
@@ -32,7 +51,10 @@ impl App {
                 session_state,
             );
 
-            return Ok(Self { session });
+            return Ok(Self {
+                session,
+                permits: policy.permits.clone(),
+            });
         }
 
         Err(io::Error::new(
@@ -40,6 +62,23 @@ impl App {
             "no defined policy for this user",
         )
         .into())
+    }
+
+    /// Check if a user is allowed to run as a target.
+    pub fn check(&self, target: &Passwd) -> Result<()> {
+        // ᕙ(⇀‸↼‵‵)ᕗ
+        if !(self.session.get_user() == target
+            || self.permits.targets.contains(&target.name)
+            || self.permits.all_targets)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!("not permitted to run as user {}", target.name),
+            )
+            .into());
+        }
+
+        Ok(())
     }
 
     /// Run the appropriate method for given options.
@@ -72,6 +111,7 @@ impl App {
         let exit = Cell::new(None);
         let target = &options.target;
 
+        self.check(target)?;
         self.session.run(
             target,
             Box::new(|| -> Result<()> {
@@ -110,11 +150,7 @@ impl App {
         }
         utils::set_mode(&path, 0o600)?;
 
-        path.push(format!(
-            "{}-{}",
-            session.get_user().name,
-            utils::get_parent_pid()
-        ));
+        path.push(format!("{}-{}", session.get_user().name, parent_id()));
 
         let mut f = fs::File::create(&path)?;
         session.get_state().try_dump(&mut f)?;
@@ -129,7 +165,7 @@ impl App {
         let mut path = PathBuf::new();
 
         path.push(Self::SESSION_DIR);
-        path.push(format!("{}-{}", user.name, utils::get_parent_pid()));
+        path.push(format!("{}-{}", user.name, parent_id()));
 
         if !path.exists() {
             return Ok(State::new());

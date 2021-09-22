@@ -2,6 +2,8 @@
 
 use std::io;
 
+use mk_pwd::Passwd;
+
 use crate::prelude::*;
 
 mod rules;
@@ -14,7 +16,7 @@ pub mod pwd;
 /// A user authentication agent.
 pub trait UserAuthenticator {
     /// Get the user this authenticator is associated with.
-    fn get_user(&self) -> &mk_pwd::Passwd;
+    fn get_user(&self) -> &Passwd;
 
     /// Authenticate the user and check if the user's account is valid.
     ///
@@ -34,7 +36,11 @@ pub trait UserAuthenticator {
     /// # Errors
     ///
     /// This function fails if the underlying service was unable to start or close a session.
-    fn session<'a>(&self, session: Box<dyn FnOnce() -> Result<()> + 'a>) -> Result<Result<()>>;
+    fn session<'a>(
+        &self,
+        session: Box<dyn FnOnce() -> Result<()> + 'a>,
+        session_user: &Passwd,
+    ) -> Result<Result<()>>;
 }
 
 /// Create a new authenticator from the given configuration.

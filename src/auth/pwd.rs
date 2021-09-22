@@ -87,7 +87,11 @@ impl UserAuthenticator for PwdAuthenticator {
         self.authenticate()
     }
 
-    fn session<'a>(&self, session: Box<dyn FnOnce() -> Result<()> + 'a>) -> Result<Result<()>> {
+    fn session<'a>(
+        &self,
+        session: Box<dyn FnOnce() -> Result<()> + 'a>,
+        _: &Passwd,
+    ) -> Result<Result<()>> {
         Ok(session())
     }
 }

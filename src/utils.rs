@@ -8,16 +8,6 @@ use std::time::Duration;
 
 use mk_common::*;
 
-/// Interpret an integer as a [`Duration`]. Intended for serialization in configurations.
-#[inline]
-pub fn duration_from_minutes(val: i64) -> Option<Duration> {
-    if val < 0 {
-        None
-    } else {
-        Some(Duration::from_secs(val as u64 * 60))
-    }
-}
-
 /// Get the `PATH` variable from the environment.
 ///
 /// Returns a fallback string if it is not available.
@@ -33,6 +23,7 @@ pub fn get_path() -> String {
 /// Get the real user ID of the calling process.
 #[must_use]
 #[inline]
+#[allow(unsafe_code)]
 pub fn get_uid() -> Uid {
     unsafe { libc::getuid() }
 }
@@ -40,15 +31,9 @@ pub fn get_uid() -> Uid {
 /// Get the effective user ID of the calling process.
 #[must_use]
 #[inline]
+#[allow(unsafe_code)]
 pub fn get_euid() -> Uid {
     unsafe { libc::geteuid() }
-}
-
-// Get the PID of the parent process.
-#[must_use]
-#[inline]
-pub fn get_parent_pid() -> Pid {
-    unsafe { libc::getppid() }
 }
 
 /// Change a given file's mode.
@@ -66,6 +51,27 @@ pub fn readln_from_tty() -> io::Result<String> {
     let mut reader = BufReader::new(tty);
     reader.read_line(&mut input)?;
     Ok(input)
+}
+
+pub mod timeout_serializer {
+    use super::*;
+
+    use serde::{Deserialize, Serialize};
+
+    pub fn serialize<S: serde::Serializer>(
+        dur: &Option<Duration>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        ser_duration(dur, DurationResolution::Minutes).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<Duration>, D::Error> {
+        let val = i64::deserialize(deserializer)?;
+
+        Ok(de_duration(val, DurationResolution::Minutes))
+    }
 }
 
 /// Read a password from the tty.

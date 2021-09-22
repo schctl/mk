@@ -6,9 +6,11 @@ use crate::prelude::*;
 
 /// Default field values.
 pub(crate) mod defaults {
+    use super::*;
+
     #[inline]
-    pub const fn timeout() -> i64 {
-        2
+    pub const fn timeout() -> Option<Duration> {
+        Some(Duration::from_secs(120))
     }
 }
 
@@ -39,16 +41,9 @@ impl Default for AuthService {
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct Rules {
     /// Validation timeout.
+    #[serde(with = "utils::timeout_serializer")]
     #[serde(default = "defaults::timeout")]
-    timeout: i64,
-}
-
-impl Rules {
-    /// Interpret the serialized timeout as a [`Duration`].
-    #[inline]
-    pub fn get_timeout(&self) -> Option<Duration> {
-        utils::duration_from_minutes(self.timeout)
-    }
+    timeout: Option<Duration>,
 }
 
 impl Default for Rules {
