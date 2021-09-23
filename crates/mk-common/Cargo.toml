@@ -10,4 +10,3 @@ rust-version = "1.56"
 publish = false
 
 [dependencies]
-libc = "0.2"

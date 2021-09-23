@@ -2,7 +2,7 @@
 
 use std::io;
 
-use mk_pwd::Passwd;
+use nix::unistd::User;
 
 use crate::prelude::*;
 
@@ -16,7 +16,7 @@ pub mod pwd;
 /// A user authentication agent.
 pub trait UserAuthenticator {
     /// Get the user this authenticator is associated with.
-    fn get_user(&self) -> &Passwd;
+    fn get_user(&self) -> &User;
 
     /// Authenticate the user and check if the user's account is valid.
     ///
@@ -39,7 +39,7 @@ pub trait UserAuthenticator {
     fn session<'a>(
         &mut self,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
-        session_user: &Passwd,
+        session_user: &User,
     ) -> Result<Result<()>>;
 }
 
@@ -48,11 +48,7 @@ pub trait UserAuthenticator {
 /// This returns an [`std::io::Error`] of kind [`std::io::ErrorKind::NotFound`] if the feature for the
 /// given type of authenticator has not been specified.
 #[allow(unreachable_patterns)]
-pub fn new(
-    user: mk_pwd::Passwd,
-    ty: AuthService,
-    rules: Rules,
-) -> Result<Box<dyn UserAuthenticator>> {
+pub fn new(user: User, ty: AuthService, rules: Rules) -> Result<Box<dyn UserAuthenticator>> {
     Ok(match ty {
         #[cfg(feature = "pam")]
         AuthService::Pam => Box::new(pam::PamAuthenticator::new(user, rules)?),

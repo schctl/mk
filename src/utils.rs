@@ -7,6 +7,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use mk_common::*;
+use nix::unistd;
 
 /// Get the `PATH` variable from the environment.
 ///
@@ -18,6 +19,16 @@ pub fn get_path() -> String {
         String::from("/usr/local/sbin:/usr/local/bin:/usr/bin"),
         |p| p.1,
     )
+}
+
+/// Get the host name string.
+pub fn get_host_name() -> crate::Result<String> {
+    let mut buf = [0_u8; 256];
+
+    match unistd::gethostname(&mut buf) {
+        Ok(c) => Ok(c.to_str()?.to_owned()),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Change a given file's mode.
@@ -66,6 +77,7 @@ macro_rules! password_from_tty {
 }
 
 /// Prompt text and read a line from `/dev/tty`.
+#[allow(unused)]
 macro_rules! prompt_from_tty {
     ($($arg:tt)*) => {
         {

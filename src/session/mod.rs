@@ -2,7 +2,7 @@
 
 use std::time::SystemTime;
 
-use mk_pwd::Passwd;
+use nix::unistd::User;
 
 use crate::auth::UserAuthenticator;
 use crate::prelude::*;
@@ -49,7 +49,7 @@ impl UserSession {
     /// Get the user this session is associated with.
     #[must_use]
     #[inline]
-    pub fn get_user(&self) -> &Passwd {
+    pub fn get_user(&self) -> &User {
         self.auth.get_user()
     }
 
@@ -65,7 +65,7 @@ impl UserSession {
     /// the session rules do not permit this action.
     pub fn run<'a>(
         &mut self,
-        target: &mk_pwd::Passwd,
+        target: &User,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
     ) -> Result<Result<()>> {
         // Check if the user needs to be re-validated
@@ -75,7 +75,7 @@ impl UserSession {
             // Check if the session has exceeded its timeout
             if let Some(s) = self.state.last_used {
                 if let Ok(dur) = SystemTime::now().duration_since(s) {
-                    if let Some(t) = self.rules.timeout {
+                    if let Some(t) = self.rules.refresh {
                         need_auth = dur > t;
                     }
                 }

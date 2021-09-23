@@ -2,22 +2,22 @@
 //!
 //! This is the fallback authenticator type, and is available on all platforms.
 
-use std::io;
+use std::io::{Error, ErrorKind};
 
-use mk_pwd::Passwd;
+use nix::unistd::User;
 
 use super::{Rules, UserAuthenticator};
 use crate::prelude::*;
 
 /// Holds all the information required for authentication using the system password database.
 pub struct PwdAuthenticator {
-    user: Passwd,
+    user: User,
     #[allow(unused)]
     rules: Rules,
 }
 
 impl PwdAuthenticator {
-    pub fn new(user: Passwd, rules: Rules) -> Result<Self> {
+    pub fn new(user: User, rules: Rules) -> Result<Self> {
         // Result only for consistency
         Ok(Self { user, rules })
     }
@@ -25,53 +25,54 @@ impl PwdAuthenticator {
     /// Authenticate the user's account.
     fn authenticate(&self) -> Result<()> {
         // Authenticate if user doesn't have a password.
-        let password = match self.user.password.clone() {
-            Some(p) => p,
-            None => return Ok(()),
+        #[allow(unused_mut)]
+        let mut password = match self.user.passwd.to_str() {
+            Ok(e) => e.to_owned(),
+            Err(_) => {
+                return Err(Error::new(ErrorKind::Other, "non utf-8 passwords unsupported").into())
+            }
         };
 
         #[cfg(feature = "shadow")]
-        let password = match &password[..] {
-            "*" => {
-                return Err(
-                    io::Error::new(io::ErrorKind::PermissionDenied, "disallowed login").into(),
-                )
-            }
-            // > On most modern systems, this field is set to x, and the user password is stored in
+        match &password[..] {
+            "*" => return Err(Error::new(ErrorKind::PermissionDenied, "disallowed login").into()),
+            // > On some systems, this field is set to x, and the user password is stored in
             // > the /etc/shadow file.
             "x" => {
-                let spwd = mk_shadow::Spwd::from_name(&self.user.name[..])?;
+                let spwd = match mk_shadow::Spwd::from_name(&self.user.name[..])?
+                    .password
+                    .to_str()
+                {
+                    Ok(e) => e.to_owned(),
+                    Err(_) => {
+                        return Err(
+                            Error::new(ErrorKind::Other, "non utf-8 passwords unsupported").into(),
+                        )
+                    }
+                };
 
-                if let "*" | "!" = &spwd.password[..] {
-                    return Err(io::Error::new(
-                        io::ErrorKind::PermissionDenied,
-                        "disallowed login",
-                    )
-                    .into());
+                if let "*" | "!" = &spwd[..] {
+                    return Err(Error::new(ErrorKind::PermissionDenied, "disallowed login").into());
                 }
 
-                spwd.password
+                password = spwd;
             }
-            _ => password,
+            _ => {}
         };
 
         #[cfg(not(feature = "shadow"))]
-        let password = match &password[..] {
+        match &password[..] {
             "*" | "x" => {
-                return Err(
-                    io::Error::new(io::ErrorKind::PermissionDenied, "disallowed login").into(),
-                )
+                return Err(Error::new(ErrorKind::PermissionDenied, "disallowed login").into())
             }
-            _ => password,
+            _ => {}
         };
 
         if !pwhash::unix::verify(
             &password_from_tty!("[{}] Password: ", SERVICE_NAME)?,
             &password[..],
         ) {
-            return Err(
-                io::Error::new(io::ErrorKind::PermissionDenied, "permission denied").into(),
-            );
+            return Err(Error::new(ErrorKind::PermissionDenied, "permission denied").into());
         }
 
         Ok(())
@@ -79,7 +80,7 @@ impl PwdAuthenticator {
 }
 
 impl UserAuthenticator for PwdAuthenticator {
-    fn get_user(&self) -> &Passwd {
+    fn get_user(&self) -> &User {
         &self.user
     }
 
@@ -90,7 +91,7 @@ impl UserAuthenticator for PwdAuthenticator {
     fn session<'a>(
         &mut self,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
-        _: &Passwd,
+        _: &User,
     ) -> Result<Result<()>> {
         Ok(session())
     }

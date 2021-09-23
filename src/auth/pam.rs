@@ -1,8 +1,7 @@
 //! User authentication using PAM.
 
-use mk_common::get_host_name;
 use mk_pam as pam;
-use mk_pwd::Passwd;
+use nix::unistd::User;
 
 use super::{Rules, UserAuthenticator};
 use crate::prelude::*;
@@ -48,20 +47,20 @@ fn pam_conversation(
 
 /// PAM authentication structure. Holds all data required to begin a session with PAM.
 pub struct PamAuthenticator {
-    user: Passwd,
+    user: User,
     handle: pam::Handle,
     #[allow(unused)]
     rules: Rules,
 }
 
 impl PamAuthenticator {
-    pub fn new(user: Passwd, rules: Rules) -> Result<Self> {
+    pub fn new(user: User, rules: Rules) -> Result<Self> {
         let mut handle =
             pam::Handle::start(SERVICE_NAME, &user.name[..], Box::new(pam_conversation))?;
 
         let mut items = handle.items();
         items.set_request_user(&user.name[..])?;
-        items.set_request_host(&get_host_name()?[..])?;
+        items.set_request_host(&utils::get_host_name()?[..])?;
 
         Ok(Self {
             user,
@@ -72,7 +71,7 @@ impl PamAuthenticator {
 }
 
 impl UserAuthenticator for PamAuthenticator {
-    fn get_user(&self) -> &Passwd {
+    fn get_user(&self) -> &User {
         &self.user
     }
 
@@ -94,7 +93,7 @@ impl UserAuthenticator for PamAuthenticator {
     fn session<'a>(
         &mut self,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
-        session_user: &Passwd,
+        session_user: &User,
     ) -> Result<Result<()>> {
         self.handle.items().set_user(&session_user.name[..])?;
         self.handle.set_creds(pam::Flags::REINITIALIZE_CREDS)?;

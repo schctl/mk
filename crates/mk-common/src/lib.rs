@@ -1,15 +1,9 @@
 //! A collection of commonly used APIs throughout all the `mk` crates.
 
-#![allow(clippy::not_unsafe_ptr_arg_deref)]
-
 use std::ffi::CStr;
 use std::io::{Error, ErrorKind, Result};
 use std::os::raw::c_char;
 use std::time::Duration;
-
-pub type Uid = libc::uid_t;
-pub type Gid = libc::gid_t;
-pub type Pid = libc::pid_t;
 
 /// Wrapper around `*mut `[`c_char`] to [`String`] conversion, converting errors to [`io::Error`].
 ///
@@ -71,39 +65,6 @@ pub fn de_duration(val: i64, res: DurationResolution) -> Option<Duration> {
         None
     } else {
         Some(Duration::from_secs(val as u64 * res as u64))
-    }
-}
-
-/// Get the real user ID of the calling process.
-#[must_use]
-#[inline]
-pub fn get_uid() -> Uid {
-    unsafe { libc::getuid() }
-}
-
-/// Get the effective user ID of the calling process.
-#[must_use]
-#[inline]
-pub fn get_euid() -> Uid {
-    unsafe { libc::geteuid() }
-}
-
-/// Returns the standard host name of the current machine.
-///
-/// # Errors
-///
-/// - [`Error`] of [`ErrorKind::Other`] if host name could not be acquired.
-/// - If the hostname contains invalid utf-8 bytes. See [`chars_to_string`].
-pub fn get_host_name() -> Result<String> {
-    let mut buf = [0 as c_char; 256];
-    unsafe {
-        if libc::gethostname(buf.as_mut_ptr(), 256) != 0 {
-            return Err(Error::new(ErrorKind::Other, "failed to get host name"));
-        }
-
-        // If the host name is somehow longer, the last nul byte is not written
-        buf[255] = 0;
-        chars_to_string(buf.as_mut_ptr())
     }
 }
 

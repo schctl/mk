@@ -7,8 +7,7 @@ use std::os::unix::process::{parent_id, CommandExt};
 use std::path::PathBuf;
 use std::process::Command;
 
-use mk_common::get_uid;
-use mk_pwd::Passwd;
+use nix::unistd::{getuid, User};
 
 use crate::auth;
 use crate::config::Config;
@@ -25,11 +24,20 @@ pub struct App {
 
 impl App {
     pub fn new(cfg: &Config) -> Result<Self> {
-        let uid = get_uid();
-        let user = Passwd::from_uid(uid)?;
+        let uid = getuid();
+        let user = match User::from_uid(uid)? {
+            Some(u) => u,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "could not find this user, for some reason",
+                )
+                .into())
+            }
+        };
 
         // Ignore configs if the user is root
-        if uid == 0 {
+        if uid.is_root() {
             let policy = Policy::root();
             let session = UserSession::new(
                 auth::new(user, cfg.service, policy.auth.clone())?,
@@ -43,7 +51,7 @@ impl App {
         }
 
         // Find a suitable policy and create a session
-        if let Some(policy) = cfg.get_user_policy(&user.name) {
+        if let Some(policy) = cfg.get_user_policy(&user)? {
             let session_state = Self::recover_session_state_or_new(&user)?;
 
             let session = UserSession::with_state(
@@ -66,7 +74,7 @@ impl App {
     }
 
     /// Check if a user is allowed to run as a target.
-    pub fn check(&self, target: &Passwd) -> Result<()> {
+    pub fn check(&self, target: &User) -> Result<()> {
         // ᕙ(⇀‸↼‵‵)ᕗ
         if !(self.session.get_user() == target
             || self.permits.targets.contains(&target.name)
@@ -118,8 +126,8 @@ impl App {
             Box::new(|| -> Result<()> {
                 let mut command = Command::new(&options.command[..]);
 
-                command.uid(options.target.uid);
-                command.gid(options.target.gid);
+                command.uid(options.target.uid.as_raw());
+                command.gid(options.target.gid.as_raw());
 
                 command.args(options.args);
 
@@ -162,7 +170,7 @@ impl App {
 
     /// Try to recover a session from its stored state a file. If a session could not be found,
     /// create a new one.
-    fn recover_session_state_or_new(user: &Passwd) -> Result<State> {
+    fn recover_session_state_or_new(user: &User) -> Result<State> {
         let mut path = PathBuf::new();
 
         path.push(Self::SESSION_DIR);

@@ -2,8 +2,7 @@
 members = [
     "crates/mk-common",
     "crates/mk-pam",
-    "crates/mk-pwd",
-    "crates/mk-shadow"
+    "crates/mk-shadow",
 ]
 
 [package]
@@ -25,7 +24,7 @@ panic = 'abort'
 codegen-units = 1
 
 [dependencies]
-libc = "0.2"
+nix = "0.22"
 
 pwhash = "1.0"
 readonly = "0.2"
@@ -38,7 +37,6 @@ toml = "0.5"
 
 mk-common = { path = "crates/mk-common" }
 mk-pam = { path = "crates/mk-pam", optional = true }
-mk-pwd = { path = "crates/mk-pwd" }
 mk-shadow = { path = "crates/mk-shadow", optional = true }
 
 [dependencies.clap]

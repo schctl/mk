@@ -1,8 +1,10 @@
 //! CLI option parsing utilities.
 
+use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 
 use clap::{App, AppSettings, Arg};
+use nix::unistd::User;
 
 use crate::options::*;
 use crate::prelude::*;
@@ -49,10 +51,21 @@ pub fn from_terminal(args: Vec<String>) -> Result<MkOptions> {
         }
     };
 
-    let target = mk_pwd::Passwd::from_name(match matches.value_of("user") {
-        Some(u) => u,
-        None => "root",
-    })?;
+    let target = {
+        let target_str = match matches.value_of("user") {
+            Some(u) => u,
+            _ => "root",
+        };
+
+        match User::from_name(target_str)? {
+            Some(u) => u,
+            _ => {
+                return Err(
+                    Error::new(ErrorKind::NotFound, format!("unknown user {}", target_str)).into(),
+                )
+            }
+        }
+    };
 
     // Parse edit options
     if let Some(e) = matches.value_of("edit") {

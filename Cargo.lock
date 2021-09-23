@@ -105,6 +105,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
+name = "cc"
+version = "1.0.70"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d26a6ce4b6a484fa3edb70f7efa6fc430fd2b87285fe8b84304fd0936faa0dc0"
+
+[[package]]
 name = "cexpr"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -352,16 +358,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
+name = "memoffset"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59accc507f1338036a0477ef61afdae33cde60840f4dfe481319ce3ad116ddf9"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "mk"
 version = "0.0.1"
 dependencies = [
  "byteorder",
  "clap 3.0.0-beta.4",
- "libc",
  "mk-common",
  "mk-pam",
- "mk-pwd",
  "mk-shadow",
+ "nix",
  "pwhash",
  "readonly",
  "rpassword",
@@ -373,9 +387,6 @@ dependencies = [
 [[package]]
 name = "mk-common"
 version = "0.0.1"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "mk-pam"
@@ -390,7 +401,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mk-pwd"
+name = "mk-shadow"
 version = "0.0.1"
 dependencies = [
  "lazy_static",
@@ -399,12 +410,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "mk-shadow"
-version = "0.0.1"
+name = "nix"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf1e25ee6b412c2a1e3fcb6a4499a5c1bfe7f43e014bdce9a6b6666e5aa2d187"
 dependencies = [
- "lazy_static",
+ "bitflags",
+ "cc",
+ "cfg-if",
  "libc",
- "mk-common",
+ "memoffset",
 ]
 
 [[package]]

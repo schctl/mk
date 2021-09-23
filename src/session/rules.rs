@@ -9,7 +9,7 @@ pub(crate) mod defaults {
     use super::*;
 
     #[inline]
-    pub const fn timeout() -> Option<Duration> {
+    pub const fn refresh() -> Option<Duration> {
         None
     }
 
@@ -25,8 +25,8 @@ pub(crate) mod defaults {
 pub struct Rules {
     /// Maximum inactive duration after which the session must re-validate its user.
     #[serde(with = "utils::timeout_serializer")]
-    #[serde(default = "defaults::timeout")]
-    pub timeout: Option<Duration>,
+    #[serde(default = "defaults::refresh")]
+    pub refresh: Option<Duration>,
     /// Allow session to forego user validation.
     #[serde(default = "defaults::no_auth")]
     pub no_auth: bool,
@@ -35,7 +35,7 @@ pub struct Rules {
 impl Default for Rules {
     fn default() -> Self {
         Self {
-            timeout: defaults::timeout(),
+            refresh: defaults::refresh(),
             no_auth: defaults::no_auth(),
         }
     }
