@@ -7,6 +7,7 @@ use std::os::unix::process::{parent_id, CommandExt};
 use std::path::PathBuf;
 use std::process::Command;
 
+use mk_common::get_uid;
 use mk_pwd::Passwd;
 
 use crate::auth;
@@ -24,7 +25,7 @@ pub struct App {
 
 impl App {
     pub fn new(cfg: &Config) -> Result<Self> {
-        let uid = utils::get_uid();
+        let uid = get_uid();
         let user = Passwd::from_uid(uid)?;
 
         // Ignore configs if the user is root

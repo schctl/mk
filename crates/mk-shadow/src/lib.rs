@@ -35,8 +35,6 @@ pub struct Spwd {
     pub inactive_duration: Option<Duration>,
     /// Date when the user's account expired.
     pub expiry: Option<SystemTime>,
-    /// Reserved field.
-    pub flag: u64,
 }
 
 impl Spwd {
@@ -63,7 +61,6 @@ impl Spwd {
             inactive_duration: de_duration(raw.sp_inact, DurationResolution::Days),
             expiry: de_duration(raw.sp_expire, DurationResolution::Days)
                 .map(|d| SystemTime::UNIX_EPOCH + d),
-            flag: raw.sp_flag as u64,
         })
     }
 

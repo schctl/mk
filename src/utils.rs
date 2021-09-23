@@ -20,22 +20,6 @@ pub fn get_path() -> String {
     )
 }
 
-/// Get the real user ID of the calling process.
-#[must_use]
-#[inline]
-#[allow(unsafe_code)]
-pub fn get_uid() -> Uid {
-    unsafe { libc::getuid() }
-}
-
-/// Get the effective user ID of the calling process.
-#[must_use]
-#[inline]
-#[allow(unsafe_code)]
-pub fn get_euid() -> Uid {
-    unsafe { libc::geteuid() }
-}
-
 /// Change a given file's mode.
 pub fn set_mode<P: AsRef<Path>>(path: P, mode: u32) -> io::Result<()> {
     let mut perms = fs::metadata(path.as_ref())?.permissions();

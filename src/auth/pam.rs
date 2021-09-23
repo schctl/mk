@@ -1,5 +1,6 @@
 //! User authentication using PAM.
 
+use mk_common::get_host_name;
 use mk_pam as pam;
 use mk_pwd::Passwd;
 
@@ -11,37 +12,35 @@ fn pam_conversation(
     messages: &mut [pam::MessageContainer],
 ) -> core::result::Result<(), pam::PamError> {
     for msg in messages {
-        let resp = match msg.msg.kind() {
-            pam::MessageType::Prompt => Some(pam::Response {
-                resp: {
-                    match prompt_from_tty!("[{}] {}", SERVICE_NAME, &msg.msg.contents()[..]) {
-                        Ok(p) => p,
-                        Err(_) => return Err(pam::PamError::Conversation),
-                    }
-                },
-                retcode: 0,
-            }),
-            pam::MessageType::PromptNoEcho => Some(pam::Response {
-                resp: {
-                    match password_from_tty!("[{}] {}", SERVICE_NAME, &msg.msg.contents()[..]) {
-                        Ok(p) => p,
-                        Err(_) => return Err(pam::PamError::Conversation),
-                    }
-                },
-                retcode: 0,
-            }),
+        match msg.msg.kind() {
+            pam::MessageType::Prompt => {
+                msg.resp = Some(pam::Response {
+                    resp: {
+                        match prompt_from_tty!("[{}] {}", SERVICE_NAME, &msg.msg.contents()[..]) {
+                            Ok(p) => p,
+                            Err(_) => return Err(pam::PamError::Conversation),
+                        }
+                    },
+                })
+            }
+            pam::MessageType::PromptNoEcho => {
+                msg.resp = Some(pam::Response {
+                    resp: {
+                        match password_from_tty!("[{}] {}", SERVICE_NAME, &msg.msg.contents()[..]) {
+                            Ok(p) => p,
+                            Err(_) => return Err(pam::PamError::Conversation),
+                        }
+                    },
+                })
+            }
             pam::MessageType::ShowText => {
                 println!("[{}] {}", SERVICE_NAME, msg.msg.contents());
-                None
             }
             pam::MessageType::ShowError => {
                 eprintln!("[{}] {}", SERVICE_NAME, msg.msg.contents());
-                None
             }
-            _ => None,
-        };
-
-        msg.resp = resp;
+            _ => {}
+        }
     }
 
     Ok(())
@@ -57,11 +56,12 @@ pub struct PamAuthenticator {
 
 impl PamAuthenticator {
     pub fn new(user: Passwd, rules: Rules) -> Result<Self> {
-        let handle = pam::Handle::start(SERVICE_NAME, &user.name[..], Box::new(pam_conversation))?;
+        let mut handle =
+            pam::Handle::start(SERVICE_NAME, &user.name[..], Box::new(pam_conversation))?;
 
-        handle.items().set_request_user(&user.name[..])?;
-
-        // TODO: host name
+        let mut items = handle.items();
+        items.set_request_user(&user.name[..])?;
+        items.set_request_host(&get_host_name()?[..])?;
 
         Ok(Self {
             user,
@@ -76,7 +76,7 @@ impl UserAuthenticator for PamAuthenticator {
         &self.user
     }
 
-    fn validate(&self) -> Result<()> {
+    fn validate(&mut self) -> Result<()> {
         self.handle.authenticate(pam::Flags::NONE)?;
 
         match self.handle.validate(pam::Flags::NONE) {
@@ -92,7 +92,7 @@ impl UserAuthenticator for PamAuthenticator {
     }
 
     fn session<'a>(
-        &self,
+        &mut self,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
         session_user: &Passwd,
     ) -> Result<Result<()>> {

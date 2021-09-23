@@ -40,22 +40,20 @@ enum ItemKind {
 
 /// Manages PAM items associated with a [`Handle`].
 pub struct Items<'a> {
-    pub(crate) handle: &'a Handle,
+    pub(crate) handle: &'a mut Handle,
 }
 
 impl<'a> Items<'a> {
     #[inline]
-    fn set_str(&self, data: &str) -> Result<()> {
-        self.handle.set_item(
-            ItemKind::RequestUser as c_int,
-            CString::new(data)?.into_raw() as *const c_void,
-        )
+    fn set_str(&mut self, ty: c_int, data: &str) -> Result<()> {
+        self.handle
+            .set_item(ty, CString::new(data)?.into_raw() as *const c_void)
     }
 
     /// The name of the user that will use this service.
     #[inline]
-    pub fn set_user(&self, user: &str) -> Result<()> {
-        self.set_str(user)
+    pub fn set_user(&mut self, user: &str) -> Result<()> {
+        self.set_str(ffi::PAM_USER as c_int, user)
     }
 
     /// The name of the user requesting authentication (the applicant).
@@ -63,8 +61,14 @@ impl<'a> Items<'a> {
     /// Local name for a locally requesting user or a remote user name for a remote requesting user.
     /// `RequestUser@RequestHost` should always identify the requesting user.
     #[inline]
-    pub fn set_request_user(&self, user: &str) -> Result<()> {
-        self.set_str(user)
+    pub fn set_request_user(&mut self, user: &str) -> Result<()> {
+        self.set_str(ffi::PAM_RUSER as c_int, user)
+    }
+
+    /// The name of the applicant's host machine.
+    #[inline]
+    pub fn set_request_host(&mut self, host: &str) -> Result<()> {
+        self.set_str(ffi::PAM_RHOST as c_int, host)
     }
 }
 
@@ -162,16 +166,6 @@ impl TryFrom<*const ffi::pam_message> for Message {
 pub struct Response {
     /// The actual response.
     pub resp: String,
-    /// Unused - 0 is expected.
-    pub retcode: i64,
-}
-
-impl Response {
-    /// Create a new PAM message response.
-    #[must_use]
-    pub fn new(resp: String, retcode: i64) -> Self {
-        Self { resp, retcode }
-    }
 }
 
 impl TryFrom<Response> for ffi::pam_response {
@@ -180,7 +174,7 @@ impl TryFrom<Response> for ffi::pam_response {
     fn try_from(value: Response) -> Result<Self> {
         Ok(ffi::pam_response {
             resp: CString::new(value.resp)?.into_raw(),
-            resp_retcode: value.retcode as c_int,
+            resp_retcode: 0,
         })
     }
 }

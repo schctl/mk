@@ -1,5 +1,8 @@
 //! `mk` is a tool to run unix commands as another user, and a family of crates. It is similar to
-//! [`doas`](https://github.com/Duncaen/OpenDoas) or [`sudo`](https://github.com/sudo-project/sudo).
+//! [`doas`] or [`sudo`].
+//!
+//! [`doas`]: https://github.com/Duncaen/OpenDoas
+//! [`sudo`]: https://www.sudo.ws/
 
 #![deny(unsafe_code)]
 

@@ -83,12 +83,12 @@ impl UserAuthenticator for PwdAuthenticator {
         &self.user
     }
 
-    fn validate(&self) -> Result<()> {
+    fn validate(&mut self) -> Result<()> {
         self.authenticate()
     }
 
     fn session<'a>(
-        &self,
+        &mut self,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
         _: &Passwd,
     ) -> Result<Result<()>> {

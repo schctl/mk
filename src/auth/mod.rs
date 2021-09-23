@@ -23,7 +23,7 @@ pub trait UserAuthenticator {
     /// # Errors
     ///
     /// This function fails if the user could not be validated.
-    fn validate(&self) -> Result<()>;
+    fn validate(&mut self) -> Result<()>;
 
     /// Run a function in an authenticated session.
     ///
@@ -37,7 +37,7 @@ pub trait UserAuthenticator {
     ///
     /// This function fails if the underlying service was unable to start or close a session.
     fn session<'a>(
-        &self,
+        &mut self,
         session: Box<dyn FnOnce() -> Result<()> + 'a>,
         session_user: &Passwd,
     ) -> Result<Result<()>>;

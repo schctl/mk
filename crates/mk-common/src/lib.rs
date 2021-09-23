@@ -32,13 +32,14 @@ pub unsafe fn chars_to_string(ptr: *mut c_char) -> Result<String> {
     }
 
     match CStr::from_ptr(ptr).to_str() {
-        Ok(s) => Ok(s.to_string()),
+        Ok(s) => Ok(s.to_owned()),
         Err(e) => Err(Error::new(ErrorKind::InvalidData, e)),
     }
 }
 
 /// Durations represented as seconds.
 #[repr(u64)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DurationResolution {
     Seconds = 1,
     Minutes = 60,
@@ -70,6 +71,39 @@ pub fn de_duration(val: i64, res: DurationResolution) -> Option<Duration> {
         None
     } else {
         Some(Duration::from_secs(val as u64 * res as u64))
+    }
+}
+
+/// Get the real user ID of the calling process.
+#[must_use]
+#[inline]
+pub fn get_uid() -> Uid {
+    unsafe { libc::getuid() }
+}
+
+/// Get the effective user ID of the calling process.
+#[must_use]
+#[inline]
+pub fn get_euid() -> Uid {
+    unsafe { libc::geteuid() }
+}
+
+/// Returns the standard host name of the current machine.
+///
+/// # Errors
+///
+/// - [`Error`] of [`ErrorKind::Other`] if host name could not be acquired.
+/// - If the hostname contains invalid utf-8 bytes. See [`chars_to_string`].
+pub fn get_host_name() -> Result<String> {
+    let mut buf = [0 as c_char; 256];
+    unsafe {
+        if libc::gethostname(buf.as_mut_ptr(), 256) != 0 {
+            return Err(Error::new(ErrorKind::Other, "failed to get host name"));
+        }
+
+        // If the host name is somehow longer, the last nul byte is not written
+        buf[255] = 0;
+        chars_to_string(buf.as_mut_ptr())
     }
 }
 
